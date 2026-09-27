@@ -8,6 +8,7 @@ from services.economic_service import (
     calcular_valor_economico,
     formatar_real,
 )
+from services.export_service import gerar_csv_analise
 from services.hybrid_product_service import resolver_produto_hibrido
 
 
@@ -1092,10 +1093,36 @@ with col_voltar:
         st.switch_page("pages/01_home.py")
 
 with col_exportar:
-    st.button(
+    csv_analise = gerar_csv_analise(
+        equipamento=nome_aparelho,
+        quantidade=quantidade,
+        massa_total_g=massa_total,
+        massa_media_g=massa_media,
+        categoria=categoria_analise,
+        fonte_principal=origem_categoria,
+        fontes_utilizadas=fontes_utilizadas,
+        materiais=materiais,
+        materiais_economicos=materiais_economicos,
+        massa_recuperavel_g=massa_recuperavel,
+        percentual_recuperavel=percentual_recuperavel,
+        valor_total_estimado=valor_total,
+        recomendacoes=recomendacoes,
+    )
+
+    nome_arquivo = (
+        "chipper_"
+        + "".join(
+            caractere.lower() if caractere.isalnum() else "_"
+            for caractere in nome_aparelho
+        ).strip("_")
+        + ".csv"
+    )
+
+    st.download_button(
         "EXPORTAR CSV",
-        disabled=True,
-        help=(
-            "A exportação CSV poderá ser ativada em uma próxima etapa."
-        ),
+        data=csv_analise,
+        file_name=nome_arquivo,
+        mime="text/csv",
+        use_container_width=True,
+        help="Baixar os resultados desta análise em CSV.",
     )
