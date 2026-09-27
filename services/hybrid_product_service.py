@@ -178,11 +178,12 @@ def resolver_produto_hibrido(
         )
     )
 
-    if _categoria_mobile(
-        str(
-            categoria_para_mobile
-        )
-    ):
+    deve_tentar_mobile = (
+        _categoria_mobile(str(categoria_para_mobile))
+        or str(categoria_para_mobile) == "desconhecido"
+    )
+
+    if deve_tentar_mobile:
         try:
             consulta_mobile = (
                 buscar_dispositivo(
