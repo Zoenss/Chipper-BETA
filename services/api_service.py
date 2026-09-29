@@ -88,6 +88,107 @@ def _normalizar_resposta(
     }
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _buscar_dispositivo_cache(
+    nome: str,
+    chave: str,
+) -> dict[str, Any]:
+    params = {
+        "name": nome,
+        "page": 1,
+        "key": chave,
+    }
+
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    return _executar_busca_mobile(params, headers)
+
+
+def _executar_busca_mobile(
+    params: dict[str, Any],
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    try:
+        resposta = requests.get(
+            MOBILE_API_URL,
+            params=params,
+            headers=headers,
+            timeout=20,
+        )
+    except requests.Timeout as erro:
+        raise MobileAPIError(
+            "A MobileAPI demorou demais para responder."
+        ) from erro
+    except requests.ConnectionError as erro:
+        raise MobileAPIError(
+            "Não foi possível conectar à MobileAPI."
+        ) from erro
+    except requests.RequestException as erro:
+        raise MobileAPIError(
+            f"Erro de comunicação com a MobileAPI: {erro}"
+        ) from erro
+
+    if resposta.status_code == 204:
+        return {
+            "encontrado": False,
+            "resultados": {"devices": []},
+            "fonte": "MobileAPI",
+        }
+
+    if resposta.status_code == 400:
+        detalhe = ""
+        try:
+            corpo = resposta.json()
+            if isinstance(corpo, dict):
+                detalhe = str(
+                    corpo.get("detail")
+                    or corpo.get("message")
+                    or corpo.get("error")
+                    or ""
+                ).strip()
+        except ValueError:
+            detalhe = resposta.text[:300].strip()
+
+        mensagem = (
+            "A MobileAPI rejeitou a consulta. "
+            "Verifique os parâmetros enviados e o saldo de créditos da conta."
+        )
+        if detalhe:
+            mensagem += f" Detalhe: {detalhe}"
+        raise MobileAPIError(mensagem)
+
+    if resposta.status_code == 401:
+        raise MobileAPIError(
+            "A chave da MobileAPI é inválida ou não foi autorizada."
+        )
+    if resposta.status_code == 429:
+        raise MobileAPIError(
+            "O limite de consultas da MobileAPI foi atingido."
+        )
+    if resposta.status_code != 200:
+        raise MobileAPIError(
+            "A MobileAPI retornou HTTP "
+            f"{resposta.status_code}."
+        )
+
+    try:
+        dados = resposta.json()
+    except ValueError as erro:
+        raise MobileAPIError(
+            "A MobileAPI retornou uma resposta inválida."
+        ) from erro
+
+    if not isinstance(dados, dict):
+        raise MobileAPIError(
+            "A MobileAPI retornou um formato inesperado."
+        )
+
+    return _normalizar_resposta(dados)
+
+
 def buscar_dispositivo(
     nome_aparelho: str,
 ) -> dict[str, Any]:
@@ -117,89 +218,9 @@ def buscar_dispositivo(
 
     chave = _obter_api_key()
 
-    params = {
-        "name": nome,
-        "page": 1,
-        "key": chave,
-    }
-
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-    }
-
-    try:
-        resposta = requests.get(
-            MOBILE_API_URL,
-            params=params,
-            headers=headers,
-            timeout=20,
-        )
-
-    except requests.Timeout as erro:
-        raise MobileAPIError(
-            "A MobileAPI demorou demais para responder."
-        ) from erro
-
-    except requests.ConnectionError as erro:
-        raise MobileAPIError(
-            "Não foi possível conectar à MobileAPI."
-        ) from erro
-
-    except requests.RequestException as erro:
-        raise MobileAPIError(
-            f"Erro de comunicação com a MobileAPI: {erro}"
-        ) from erro
-
-    # --------------------------------------------------------
-    # TRATAMENTO DOS STATUS HTTP
-    # --------------------------------------------------------
-
-    if resposta.status_code == 204:
-        return {
-            "encontrado": False,
-            "resultados": {
-                "devices": [],
-            },
-            "fonte": "MobileAPI",
-        }
-
-    if resposta.status_code == 400:
-        raise MobileAPIError(
-            "A MobileAPI rejeitou os parâmetros da consulta."
-        )
-
-    if resposta.status_code == 401:
-        raise MobileAPIError(
-            "A chave da MobileAPI é inválida ou não foi autorizada."
-        )
-
-    if resposta.status_code == 429:
-        raise MobileAPIError(
-            "O limite de consultas da MobileAPI foi atingido."
-        )
-
-    if resposta.status_code != 200:
-        raise MobileAPIError(
-            "A MobileAPI retornou HTTP "
-            f"{resposta.status_code}."
-        )
-
-    try:
-        dados = resposta.json()
-
-    except ValueError as erro:
-        raise MobileAPIError(
-            "A MobileAPI retornou uma resposta inválida."
-        ) from erro
-
-    if not isinstance(dados, dict):
-        raise MobileAPIError(
-            "A MobileAPI retornou um formato inesperado."
-        )
-
-    return _normalizar_resposta(
-        dados
+    return _buscar_dispositivo_cache(
+        nome,
+        chave,
     )
 
 
