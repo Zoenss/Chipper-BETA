@@ -27,6 +27,16 @@ def _categoria_mobile(categoria: str) -> bool:
     }
 
 
+def _pontuacao_match(valor: Any) -> float:
+    if valor is None:
+        return -1.0
+    texto = str(valor).strip().replace("%", "")
+    try:
+        return float(texto)
+    except (TypeError, ValueError):
+        return -1.0
+
+
 def _resumo_mobile(
     consulta: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
@@ -60,12 +70,22 @@ def _resumo_mobile(
     if not dispositivos:
         return None
 
-    primeiro = dispositivos[0]
+    melhor = max(
+        dispositivos,
+        key=lambda item: _pontuacao_match(
+            item.get("match_certainty")
+            if isinstance(item, dict)
+            else None
+        ),
+    )
+
+    if not isinstance(melhor, dict):
+        return None
 
     return {
         "encontrado": True,
         "fonte": "MobileAPI",
-        "dados": primeiro,
+        "dados": melhor,
     }
 
 def resolver_produto_hibrido(
