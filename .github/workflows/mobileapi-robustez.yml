@@ -1,0 +1,97 @@
+name: Improve MobileAPI robustness
+
+on:
+  push:
+    branches: [fix/mobileapi-robustez]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'Improve MobileAPI robustness') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobileapi-robustez
+
+      - name: Patch MobileAPI service and hybrid selector
+        shell: python
+        run: |
+          from pathlib import Path
+
+          api_path = Path('services/api_service.py')
+          api = api_path.read_text(encoding='utf-8')
+
+          old = '''def buscar_dispositivo(\n    nome_aparelho: str,\n) -> dict[str, Any]:'''
+          new = '''@st.cache_data(ttl=3600, show_spinner=False)\ndef _buscar_dispositivo_cache(\n    nome: str,\n    chave: str,\n) -> dict[str, Any]:\n    params = {\n        "name": nome,\n        "page": 1,\n        "key": chave,\n    }\n\n    headers = {\n        "Accept": "application/json",\n        "Content-Type": "application/json",\n    }\n\n    return _executar_busca_mobile(params, headers)\n\n\ndef _executar_busca_mobile(\n    params: dict[str, Any],\n    headers: dict[str, str] | None = None,\n) -> dict[str, Any]:\n    try:\n        resposta = requests.get(\n            MOBILE_API_URL,\n            params=params,\n            headers=headers,\n            timeout=20,\n        )\n    except requests.Timeout as erro:\n        raise MobileAPIError(\n            "A MobileAPI demorou demais para responder."\n        ) from erro\n    except requests.ConnectionError as erro:\n        raise MobileAPIError(\n            "Não foi possível conectar à MobileAPI."\n        ) from erro\n    except requests.RequestException as erro:\n        raise MobileAPIError(\n            f"Erro de comunicação com a MobileAPI: {erro}"\n        ) from erro\n\n    if resposta.status_code == 204:\n        return {\n            "encontrado": False,\n            "resultados": {"devices": []},\n            "fonte": "MobileAPI",\n        }\n\n    if resposta.status_code == 400:\n        detalhe = ""\n        try:\n            corpo = resposta.json()\n            if isinstance(corpo, dict):\n                detalhe = str(\n                    corpo.get("detail")\n                    or corpo.get("message")\n                    or corpo.get("error")\n                    or ""\n                ).strip()\n        except ValueError:\n            detalhe = resposta.text[:300].strip()\n\n        mensagem = (\n            "A MobileAPI rejeitou a consulta. "\n            "Verifique os parâmetros enviados e o saldo de créditos da conta."\n        )\n        if detalhe:\n            mensagem += f" Detalhe: {detalhe}"\n        raise MobileAPIError(mensagem)\n\n    if resposta.status_code == 401:\n        raise MobileAPIError(\n            "A chave da MobileAPI é inválida ou não foi autorizada."\n        )\n    if resposta.status_code == 429:\n        raise MobileAPIError(\n            "O limite de consultas da MobileAPI foi atingido."\n        )\n    if resposta.status_code != 200:\n        raise MobileAPIError(\n            "A MobileAPI retornou HTTP "\n            f"{resposta.status_code}."\n        )\n\n    try:\n        dados = resposta.json()\n    except ValueError as erro:\n        raise MobileAPIError(\n            "A MobileAPI retornou uma resposta inválida."\n        ) from erro\n\n    if not isinstance(dados, dict):\n        raise MobileAPIError(\n            "A MobileAPI retornou um formato inesperado."\n        )\n\n    return _normalizar_resposta(dados)\n\n\ndef buscar_dispositivo(\n    nome_aparelho: str,\n) -> dict[str, Any]:'''
+          if old not in api:
+              raise SystemExit('Ponto de insercao de cache nao encontrado')
+          api = api.replace(old, new, 1)
+
+          start = api.index('    chave = _obter_api_key()\n\n    params = {', api.index('def buscar_dispositivo('))
+          end_marker = '    return _normalizar_resposta(\n        dados\n    )'
+          end = api.index(end_marker, start) + len(end_marker)
+          replacement = '''    chave = _obter_api_key()\n\n    return _buscar_dispositivo_cache(\n        nome,\n        chave,\n    )'''
+          api = api[:start] + replacement + api[end:]
+          api_path.write_text(api, encoding='utf-8')
+
+          hybrid_path = Path('services/hybrid_product_service.py')
+          hybrid = hybrid_path.read_text(encoding='utf-8')
+
+          old_helper = '''def _resumo_mobile(\n    consulta: dict[str, Any] | None,\n) -> dict[str, Any] | None:'''
+          new_helper = '''def _pontuacao_match(valor: Any) -> float:\n    if valor is None:\n        return -1.0\n    texto = str(valor).strip().replace("%", "")\n    try:\n        return float(texto)\n    except (TypeError, ValueError):\n        return -1.0\n\n\ndef _resumo_mobile(\n    consulta: dict[str, Any] | None,\n) -> dict[str, Any] | None:'''
+          if old_helper not in hybrid:
+              raise SystemExit('Helper MobileAPI nao encontrado')
+          hybrid = hybrid.replace(old_helper, new_helper, 1)
+
+          old_pick = '''    primeiro = dispositivos[0]\n\n    return {\n        "encontrado": True,\n        "fonte": "MobileAPI",\n        "dados": primeiro,\n    }'''
+          new_pick = '''    melhor = max(\n        dispositivos,\n        key=lambda item: _pontuacao_match(\n            item.get("match_certainty")\n            if isinstance(item, dict)\n            else None\n        ),\n    )\n\n    if not isinstance(melhor, dict):\n        return None\n\n    return {\n        "encontrado": True,\n        "fonte": "MobileAPI",\n        "dados": melhor,\n    }'''
+          if old_pick not in hybrid:
+              raise SystemExit('Selecao do primeiro resultado nao encontrada')
+          hybrid = hybrid.replace(old_pick, new_pick, 1)
+          hybrid_path.write_text(hybrid, encoding='utf-8')
+
+      - name: Validate syntax and selector behavior
+        run: |
+          python -m py_compile services/api_service.py services/hybrid_product_service.py
+          python - <<'PY'
+          import sys
+          import types
+
+          fake_streamlit = types.SimpleNamespace(
+              cache_data=lambda **kwargs: (lambda fn: fn),
+              secrets={},
+          )
+          sys.modules['streamlit'] = fake_streamlit
+
+          from services.hybrid_product_service import _resumo_mobile, _pontuacao_match
+
+          assert _pontuacao_match('98.5%') == 98.5
+          assert _pontuacao_match(75) == 75.0
+          assert _pontuacao_match(None) == -1.0
+
+          consulta = {
+              'encontrado': True,
+              'resultados': {
+                  'devices': [
+                      {'name': 'S24 FE', 'match_certainty': '82.1%'},
+                      {'name': 'S24', 'match_certainty': '97.8%'},
+                      {'name': 'S24 Ultra', 'match_certainty': 91.0},
+                  ]
+              }
+          }
+          resumo = _resumo_mobile(consulta)
+          assert resumo['dados']['name'] == 'S24'
+          print('OK')
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/api_service.py services/hybrid_product_service.py
+          git diff --cached --quiet && exit 0
+          git commit -m "Improve MobileAPI robustness"
+          git push
