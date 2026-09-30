@@ -8,7 +8,11 @@ import streamlit as st
 
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_URLS = (
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.nchc.org.tw/api/interpreter",
+)
 USER_AGENT = "CHIPPER-Reverse-Logistics/alpha"
 
 
@@ -90,6 +94,34 @@ def _endereco(tags: dict[str, Any]) -> str:
     return " - ".join(partes) if partes else "Endereço não informado no OpenStreetMap"
 
 
+def _consultar_overpass(query: str) -> dict[str, Any]:
+    ultimo_erro: Exception | None = None
+
+    for url in OVERPASS_URLS:
+        try:
+            resposta = requests.post(
+                url,
+                data={"data": query},
+                headers={"User-Agent": USER_AGENT},
+                timeout=20,
+            )
+            resposta.raise_for_status()
+            dados = resposta.json()
+
+            if not isinstance(dados, dict):
+                raise ValueError("Resposta Overpass fora do formato esperado.")
+
+            return dados
+        except (requests.RequestException, ValueError) as erro:
+            ultimo_erro = erro
+            continue
+
+    raise ReverseLogisticsError(
+        "Não foi possível consultar os pontos de descarte agora. "
+        "Os servidores públicos de consulta estão indisponíveis ou sobrecarregados."
+    ) from ultimo_erro
+
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def buscar_pontos_eletroeletronicos(
     latitude: float,
@@ -108,21 +140,7 @@ def buscar_pontos_eletroeletronicos(
     out center tags;
     """
 
-    try:
-        resposta = requests.post(
-            OVERPASS_URL,
-            data={"data": query},
-            headers={"User-Agent": USER_AGENT},
-            timeout=35,
-        )
-        resposta.raise_for_status()
-        dados = resposta.json()
-    except requests.Timeout as erro:
-        raise ReverseLogisticsError("A busca de pontos de descarte demorou demais para responder.") from erro
-    except requests.RequestException as erro:
-        raise ReverseLogisticsError("Não foi possível consultar os pontos de descarte agora.") from erro
-    except ValueError as erro:
-        raise ReverseLogisticsError("A fonte de pontos de descarte retornou dados inválidos.") from erro
+    dados = _consultar_overpass(query)
 
     elementos = dados.get("elements", []) if isinstance(dados, dict) else []
     resultados: list[dict[str, Any]] = []
