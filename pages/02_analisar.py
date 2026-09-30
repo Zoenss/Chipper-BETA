@@ -1083,7 +1083,7 @@ st.caption(
     "estimativas calculadas pelo motor CHIPPER."
 )
 
-col_voltar, col_exportar = st.columns(2)
+col_voltar, col_descartar, col_exportar = st.columns(3)
 
 with col_voltar:
     if st.button("NOVA ANÁLISE"):
@@ -1091,6 +1091,10 @@ with col_voltar:
         st.session_state.pop("peso", None)
         st.session_state.pop("quantidade", None)
         st.switch_page("pages/01_home.py")
+
+with col_descartar:
+    if st.button("ONDE DESCARTAR (ALPHA)"):
+        st.switch_page("pages/05_onde_descartar.py")
 
 with col_exportar:
     csv_analise = gerar_csv_analise(
