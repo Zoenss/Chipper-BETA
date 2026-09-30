@@ -1,0 +1,11 @@
+nome;aliases;fabricante;categoria;product_code;gtin;peso_referencia_g;fonte
+PlayStation 5;PS5|Sony PlayStation 5;Sony;console;;;;catalogo_interno
+PlayStation 4;PS4|Sony PlayStation 4;Sony;console;;;;catalogo_interno
+Xbox Series X;Xbox X|Microsoft Xbox Series X;Microsoft;console;;;;catalogo_interno
+Xbox Series S;Xbox S|Microsoft Xbox Series S;Microsoft;console;;;;catalogo_interno
+Nintendo Switch;Switch|Nintendo Switch Console;Nintendo;console;;;;catalogo_interno
+Dell Inspiron 15;Inspiron 15|Dell Inspiron;Dell;notebook;;;;catalogo_interno
+Lenovo IdeaPad 3;IdeaPad 3|Lenovo Ideapad;Lenovo;notebook;;;;catalogo_interno
+Acer Aspire 5;Aspire 5|Acer Aspire;Acer;notebook;;;;catalogo_interno
+Samsung Galaxy M55 5G;Samsung M55 5G|Samsung Galaxy M55|Galaxy M55 5G|Galaxy M55|M55 5G|M55;Samsung;phone;;;;catalogo_interno
+Samsung Odyssey G5;Odyssey G5|Samsung Odyssey G5|Samsung G5;Samsung;monitor;;;;catalogo_interno
