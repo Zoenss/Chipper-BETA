@@ -117,10 +117,16 @@ PRODUTOS: list[dict[str, Any]] = [
             "Odyssey G5",
             "Samsung Odyssey G5",
             "Samsung G5",
+            "Samsung Odyssey G5 27",
+            "Samsung Odyssey G5 27\"",
+            "S27CG552EL",
+            "LS27CG552ELMZD",
         ],
         "fabricante": "Samsung",
         "categoria": "monitor",
-        "product_code": None,
+        "product_code": "LS27CG552ELMZD",
+        "mpn": "LS27CG552ELMZD",
+        "modelo": "S27CG552EL",
         "gtin": None,
     },
 ]
@@ -231,17 +237,6 @@ def buscar_produto_local(
     # ========================================================
     # 2. CORRESPONDÊNCIA POR TEXTO CONTIDO
     # ========================================================
-    #
-    # Só aceitamos textos com tamanho razoável.
-    #
-    # Isso evita situações como:
-    #
-    # "Samsung m55 5g"
-    # virar
-    # "Samsung Odyssey G5"
-    #
-    # simplesmente porque ambos têm Samsung e G5.
-    # ========================================================
 
     for produto in PRODUTOS:
         for candidato in _nomes_produto(
@@ -257,7 +252,6 @@ def buscar_produto_local(
             if len(candidato_normalizado) < 5:
                 continue
 
-            # Consulta inteira dentro do nome cadastrado.
             if consulta in candidato_normalizado:
                 resultado = produto.copy()
                 resultado[
@@ -266,7 +260,6 @@ def buscar_produto_local(
 
                 return resultado
 
-            # Nome cadastrado dentro da consulta.
             if candidato_normalizado in consulta:
                 resultado = produto.copy()
                 resultado[
@@ -275,22 +268,16 @@ def buscar_produto_local(
 
                 return resultado
 
-    # ========================================================
-    # NENHUM RESULTADO CONFIÁVEL
-    # ========================================================
-
     return None
 
-
-# ============================================================
-# TESTE LOCAL
-# ============================================================
 
 if __name__ == "__main__":
     testes = [
         "Samsung m55 5g",
         "Galaxy M55",
         "Samsung Odyssey G5",
+        "Samsung Odyssey G5 27\"",
+        "LS27CG552ELMZD",
         "PS5",
         "PlayStation 5",
         "Xbox Series X",

@@ -109,11 +109,9 @@ def _inferir_marca_codigo(nome: str) -> tuple[str | None, str | None]:
 
     marca = aliases.get(primeiro_lower, primeiro)
 
-    # Códigos de fabricante costumam ter letras e números juntos
-    # (ex.: X1504ZA, SM-S928B, 82RK00ABBR).
     candidatos: list[str] = []
     for token in reversed(palavras[1:]):
-        limpo = token.strip("(),;:/")
+        limpo = token.strip("(),;:/\"")
         if not limpo:
             continue
         if re.search(r"[A-Za-z]", limpo) and re.search(r"\d", limpo):
@@ -165,11 +163,11 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
         "catalogo_local": produto_local,
         "mobileapi": None,
         "icecat": None,
+        "consulta_icecat": None,
         "fontes_utilizadas": [],
         "erros": [],
     }
 
-    # CATÁLOGO LOCAL
     if produto_local:
         resultado["fontes_utilizadas"].append("Catálogo local")
         categoria_catalogo = produto_local.get("categoria")
@@ -178,7 +176,6 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
         resultado["fonte_principal"] = "Catálogo local"
         resultado["encontrado"] = True
 
-    # MOBILE API: smartphones/tablets ou categoria ainda desconhecida.
     categoria_para_mobile = resultado.get("categoria_final", categoria_interna)
     deve_tentar_mobile = (
         _categoria_mobile(str(categoria_para_mobile))
@@ -230,12 +227,15 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
                 "MobileAPI: " f"{type(erro).__name__}"
             )
 
-    # ICECAT por GTIN quando o catálogo local possuir identificador.
     icecat_consultado = False
     if produto_local:
         gtin = produto_local.get("gtin")
         if gtin:
             icecat_consultado = True
+            resultado["consulta_icecat"] = {
+                "estrategia": "GTIN / EAN / UPC",
+                "gtin": str(gtin),
+            }
             try:
                 _aplicar_icecat(
                     resultado,
@@ -248,8 +248,6 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
                     "Icecat: " f"{type(erro).__name__}"
                 )
 
-    # ICECAT por fabricante + provável MPN para notebooks, desktops,
-    # monitores e consoles fora do catálogo local (ou sem GTIN).
     categoria_atual = str(resultado.get("categoria_final") or categoria_interna)
     deve_tentar_icecat_mpn = (
         not icecat_consultado
@@ -257,22 +255,47 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
     )
 
     if deve_tentar_icecat_mpn:
-        marca, codigo = _inferir_marca_codigo(nome)
+        marca = None
+        codigo = None
+        origem_codigo = "inferido do nome informado"
+
+        if produto_local:
+            marca_local = produto_local.get("fabricante")
+            codigo_local = (
+                produto_local.get("mpn")
+                or produto_local.get("product_code")
+                or produto_local.get("codigo_fabricante")
+            )
+            if marca_local and codigo_local:
+                marca = str(marca_local).strip()
+                codigo = str(codigo_local).strip()
+                origem_codigo = "catálogo local"
+
+        if not (marca and codigo):
+            marca, codigo = _inferir_marca_codigo(nome)
 
         if marca and codigo:
+            resultado["consulta_icecat"] = {
+                "estrategia": "Fabricante + MPN / código do fabricante",
+                "fabricante": marca,
+                "codigo_fabricante": codigo,
+                "origem_codigo": origem_codigo,
+            }
             try:
                 _aplicar_icecat(
                     resultado,
                     buscar_produto_por_marca_codigo(marca, codigo),
                 )
             except ProductAPIError as erro:
-                resultado["erros"].append(f"Icecat: {erro}")
+                mensagem = str(erro)
+                if "404" in mensagem or "not present" in mensagem.lower():
+                    mensagem = "Produto não localizado na base Icecat com o identificador consultado."
+                resultado["erros"].append(f"Icecat: {mensagem}")
             except Exception as erro:
                 resultado["erros"].append(
                     "Icecat: " f"{type(erro).__name__}"
                 )
 
-    # FALLBACK FINAL
     if not resultado["fontes_utilizadas"]:
         resultado["fontes_utilizadas"].append("Motor interno do CHIPPER")
 
