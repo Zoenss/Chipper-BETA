@@ -15,6 +15,7 @@ from services.product_api_service import (
     buscar_produto_por_gtin,
     buscar_produto_por_marca_codigo,
 )
+from services.upc_service import UPCItemDBError, buscar_produto_por_nome as buscar_upc_por_nome
 
 
 def _categoria_mobile(categoria: str) -> bool:
@@ -44,6 +45,27 @@ def _normalizar_dados_mobile(dados: dict[str, Any]) -> dict[str, Any]:
             normalizados["manufacturer_name"] = str(marca)
 
     return normalizados
+
+
+def _mobile_precisa_detalhes(dados: dict[str, Any]) -> bool:
+    """Evita uma segunda chamada quando a busca já trouxe ficha útil."""
+
+    campos_tecnicos = (
+        "weight",
+        "battery_capacity",
+        "release_date",
+        "storage",
+        "screen_resolution",
+        "hardware",
+    )
+    preenchidos = sum(
+        1
+        for campo in campos_tecnicos
+        if dados.get(campo) not in (None, "", [], {})
+    )
+
+    # Se ao menos quatro campos já vieram na busca, preservamos créditos.
+    return preenchidos < 4
 
 
 def _resumo_mobile(
@@ -78,8 +100,6 @@ def _resumo_mobile(
 
 
 def _inferir_marca_codigo(nome: str) -> tuple[str | None, str | None]:
-    """Infere fabricante e um provável MPN/código a partir do nome digitado."""
-
     texto = " ".join(str(nome).strip().split())
     if not texto:
         return None, None
@@ -105,6 +125,9 @@ def _inferir_marca_codigo(nome: str) -> tuple[str | None, str | None]:
         "philips": "Philips",
         "msi": "MSI",
         "gigabyte": "Gigabyte",
+        "apple": "Apple",
+        "motorola": "Motorola",
+        "xiaomi": "Xiaomi",
     }
 
     marca = aliases.get(primeiro_lower, primeiro)
@@ -144,8 +167,26 @@ def _aplicar_icecat(
         resultado["categoria_final"] = str(categoria_icecat)
 
 
+def _aplicar_upc(
+    resultado: dict[str, Any],
+    resultado_upc: dict[str, Any],
+) -> None:
+    resultado["upcitemdb"] = resultado_upc
+
+    if not resultado_upc.get("encontrado"):
+        erro = resultado_upc.get("erro")
+        if erro:
+            resultado["erros"].append(f"UPCitemdb: {erro}")
+        return
+
+    if "UPCitemdb" not in resultado["fontes_utilizadas"]:
+        resultado["fontes_utilizadas"].append("UPCitemdb")
+
+    resultado["encontrado"] = True
+
+
 def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
-    """Orquestra catálogo local, MobileAPI, Icecat e motor interno."""
+    """Orquestra catálogo local, MobileAPI, Icecat, UPCitemdb e motor interno."""
 
     nome = str(nome_produto).strip()
     if not nome:
@@ -163,6 +204,7 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
         "catalogo_local": produto_local,
         "mobileapi": None,
         "icecat": None,
+        "upcitemdb": None,
         "consulta_icecat": None,
         "fontes_utilizadas": [],
         "erros": [],
@@ -192,7 +234,7 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
 
                 if isinstance(dados_mobile, dict):
                     dispositivo_id = dados_mobile.get("id")
-                    if dispositivo_id:
+                    if dispositivo_id and _mobile_precisa_detalhes(dados_mobile):
                         try:
                             detalhes = buscar_detalhes_dispositivo(dispositivo_id)
                             if isinstance(detalhes, dict):
@@ -275,6 +317,7 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
             marca, codigo = _inferir_marca_codigo(nome)
 
         if marca and codigo:
+            icecat_consultado = True
             resultado["consulta_icecat"] = {
                 "estrategia": "Fabricante + MPN / código do fabricante",
                 "fabricante": marca,
@@ -295,6 +338,43 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
                 resultado["erros"].append(
                     "Icecat: " f"{type(erro).__name__}"
                 )
+
+    # UPCitemdb entra como fallback de identificação para produtos que o
+    # Icecat não conseguiu localizar ou para equipamentos sem identificador.
+    icecat_encontrou = bool(
+        isinstance(resultado.get("icecat"), dict)
+        and resultado["icecat"].get("encontrado")
+    )
+    deve_tentar_upc = (
+        not icecat_encontrou
+        and categoria_atual in {"notebook", "desktop", "monitor", "console", "desconhecido"}
+    )
+
+    if deve_tentar_upc:
+        try:
+            resultado_upc = buscar_upc_por_nome(nome)
+            _aplicar_upc(resultado, resultado_upc)
+
+            if resultado_upc.get("encontrado"):
+                gtin_upc = resultado_upc.get("gtin")
+                if gtin_upc:
+                    resultado["consulta_icecat"] = {
+                        "estrategia": "GTIN obtido via UPCitemdb",
+                        "gtin": str(gtin_upc),
+                        "origem_codigo": "UPCitemdb",
+                    }
+                    try:
+                        resultado_icecat_upc = buscar_produto_por_gtin(str(gtin_upc))
+                        if resultado_icecat_upc.get("encontrado"):
+                            _aplicar_icecat(resultado, resultado_icecat_upc)
+                    except ProductAPIError as erro:
+                        resultado["erros"].append(f"Icecat via UPCitemdb: {erro}")
+        except UPCItemDBError as erro:
+            resultado["erros"].append(f"UPCitemdb: {erro}")
+        except Exception as erro:
+            resultado["erros"].append(
+                "UPCitemdb: " f"{type(erro).__name__}"
+            )
 
     if not resultado["fontes_utilizadas"]:
         resultado["fontes_utilizadas"].append("Motor interno do CHIPPER")
