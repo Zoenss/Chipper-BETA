@@ -61,7 +61,7 @@ def _mobile_precisa_detalhes(dados: dict[str, Any]) -> bool:
     preenchidos = sum(
         1
         for campo in campos_tecnicos
-        if dados.get(campo) not in {None, "", [], {}}
+        if dados.get(campo) not in (None, "", [], {})
     )
 
     # Se ao menos quatro campos já vieram na busca, preservamos créditos.
