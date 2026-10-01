@@ -4,6 +4,7 @@ from typing import Any
 
 from services.api_service import (
     MobileAPIError,
+    buscar_detalhes_dispositivo,
     buscar_dispositivo,
 )
 
@@ -20,6 +21,7 @@ from services.product_api_service import (
     buscar_produto_por_gtin,
 )
 
+
 def _categoria_mobile(categoria: str) -> bool:
     return categoria in {
         "phone",
@@ -35,6 +37,21 @@ def _pontuacao_match(valor: Any) -> float:
         return float(texto)
     except (TypeError, ValueError):
         return -1.0
+
+
+def _normalizar_dados_mobile(dados: dict[str, Any]) -> dict[str, Any]:
+    normalizados = dict(dados)
+
+    if not normalizados.get("manufacturer_name"):
+        marca = normalizados.get("brand") or normalizados.get("manufacturer")
+        if isinstance(marca, dict):
+            nome_marca = marca.get("name")
+            if nome_marca:
+                normalizados["manufacturer_name"] = str(nome_marca)
+        elif marca:
+            normalizados["manufacturer_name"] = str(marca)
+
+    return normalizados
 
 
 def _resumo_mobile(
@@ -85,8 +102,9 @@ def _resumo_mobile(
     return {
         "encontrado": True,
         "fonte": "MobileAPI",
-        "dados": melhor,
+        "dados": _normalizar_dados_mobile(melhor),
     }
+
 
 def resolver_produto_hibrido(
     nome_produto: str,
@@ -99,8 +117,9 @@ def resolver_produto_hibrido(
     1. Identifica categoria pelo motor interno.
     2. Consulta catálogo local.
     3. Se for smartphone/tablet, tenta MobileAPI.
-    4. Se o catálogo tiver GTIN, tenta Icecat.
-    5. Se nenhuma API localizar, mantém os dados
+    4. Quando a MobileAPI retorna um ID, busca a ficha detalhada.
+    5. Se o catálogo tiver GTIN, tenta Icecat.
+    6. Se nenhuma API localizar, mantém os dados
        do catálogo local e do motor interno.
 
     A função não impede a análise caso uma API falhe.
@@ -127,31 +146,14 @@ def resolver_produto_hibrido(
 
     resultado: dict[str, Any] = {
         "encontrado": False,
-
         "nome_informado": nome,
-
-        "categoria_interna": (
-            categoria_interna
-        ),
-
-        "categoria_final": (
-            categoria_interna
-        ),
-
-        "fonte_principal": (
-            "Motor interno do CHIPPER"
-        ),
-
-        "catalogo_local": (
-            produto_local
-        ),
-
+        "categoria_interna": categoria_interna,
+        "categoria_final": categoria_interna,
+        "fonte_principal": "Motor interno do CHIPPER",
+        "catalogo_local": produto_local,
         "mobileapi": None,
-
         "icecat": None,
-
         "fontes_utilizadas": [],
-
         "erros": [],
     }
 
@@ -160,42 +162,22 @@ def resolver_produto_hibrido(
     # ========================================================
 
     if produto_local:
-        resultado[
-            "fontes_utilizadas"
-        ].append(
-            "Catálogo local"
-        )
+        resultado["fontes_utilizadas"].append("Catálogo local")
 
-        categoria_catalogo = (
-            produto_local.get(
-                "categoria"
-            )
-        )
-
+        categoria_catalogo = produto_local.get("categoria")
         if categoria_catalogo:
-            resultado[
-                "categoria_final"
-            ] = str(
-                categoria_catalogo
-            )
+            resultado["categoria_final"] = str(categoria_catalogo)
 
-        resultado[
-            "fonte_principal"
-        ] = "Catálogo local"
-
-        resultado[
-            "encontrado"
-        ] = True
+        resultado["fonte_principal"] = "Catálogo local"
+        resultado["encontrado"] = True
 
     # ========================================================
     # MOBILE API
     # ========================================================
 
-    categoria_para_mobile = (
-        resultado.get(
-            "categoria_final",
-            categoria_interna,
-        )
+    categoria_para_mobile = resultado.get(
+        "categoria_final",
+        categoria_interna,
     )
 
     deve_tentar_mobile = (
@@ -205,68 +187,50 @@ def resolver_produto_hibrido(
 
     if deve_tentar_mobile:
         try:
-            consulta_mobile = (
-                buscar_dispositivo(
-                    nome
-                )
-            )
-
-            resumo_mobile = (
-                _resumo_mobile(
-                    consulta_mobile
-                )
-            )
+            consulta_mobile = buscar_dispositivo(nome)
+            resumo_mobile = _resumo_mobile(consulta_mobile)
 
             if resumo_mobile:
-                resultado[
-                    "mobileapi"
-                ] = resumo_mobile
+                dados_mobile = resumo_mobile.get("dados", {})
 
-                resultado[
-                    "fontes_utilizadas"
-                ].append(
-                    "MobileAPI"
-                )
+                if isinstance(dados_mobile, dict):
+                    dispositivo_id = dados_mobile.get("id")
+                    if dispositivo_id:
+                        try:
+                            detalhes = buscar_detalhes_dispositivo(dispositivo_id)
+                            if isinstance(detalhes, dict):
+                                dados_enriquecidos = dict(dados_mobile)
+                                dados_enriquecidos.update(detalhes)
+                                resumo_mobile["dados"] = _normalizar_dados_mobile(
+                                    dados_enriquecidos
+                                )
+                        except MobileAPIError as erro:
+                            resultado["erros"].append(
+                                f"MobileAPI detalhes: {erro}"
+                            )
 
-                resultado[
-                    "fonte_principal"
-                ] = "MobileAPI"
+                resultado["mobileapi"] = resumo_mobile
+                resultado["fontes_utilizadas"].append("MobileAPI")
+                resultado["fonte_principal"] = "MobileAPI"
+                resultado["encontrado"] = True
 
-                resultado[
-                    "encontrado"
-                ] = True
-
-                dados_mobile = (
-                    resumo_mobile.get(
-                        "dados",
-                        {},
-                    )
-                )
-
+                dados_mobile_final = resumo_mobile.get("dados", {})
                 categoria_mobile = (
-                    dados_mobile.get(
-                        "device_type"
-                    )
+                    dados_mobile_final.get("device_type")
+                    if isinstance(dados_mobile_final, dict)
+                    else None
                 )
 
                 if categoria_mobile:
-                    resultado[
-                        "categoria_final"
-                    ] = str(
-                        categoria_mobile
-                    )
+                    resultado["categoria_final"] = str(categoria_mobile)
 
         except MobileAPIError as erro:
-            resultado[
-                "erros"
-            ].append(
+            resultado["erros"].append(
                 f"MobileAPI: {erro}"
             )
 
         except Exception as erro:
-            resultado[
-                "erros"
-            ].append(
+            resultado["erros"].append(
                 "MobileAPI: "
                 f"{type(erro).__name__}"
             )
@@ -276,67 +240,29 @@ def resolver_produto_hibrido(
     # ========================================================
 
     if produto_local:
-        gtin = produto_local.get(
-            "gtin"
-        )
+        gtin = produto_local.get("gtin")
 
         if gtin:
             try:
-                resultado_icecat = (
-                    buscar_produto_por_gtin(
-                        str(gtin)
-                    )
-                )
+                resultado_icecat = buscar_produto_por_gtin(str(gtin))
+                resultado["icecat"] = resultado_icecat
 
-                resultado[
-                    "icecat"
-                ] = resultado_icecat
+                if resultado_icecat.get("encontrado"):
+                    resultado["fontes_utilizadas"].append("Icecat")
+                    resultado["fonte_principal"] = "Icecat"
+                    resultado["encontrado"] = True
 
-                if resultado_icecat.get(
-                    "encontrado"
-                ):
-                    resultado[
-                        "fontes_utilizadas"
-                    ].append(
-                        "Icecat"
-                    )
-
-                    resultado[
-                        "fonte_principal"
-                    ] = "Icecat"
-
-                    resultado[
-                        "encontrado"
-                    ] = True
-
-                    categoria_icecat = (
-                        resultado_icecat.get(
-                            "categoria_chipper"
-                        )
-                    )
-
-                    if (
-                        categoria_icecat
-                        and categoria_icecat
-                        != "desconhecido"
-                    ):
-                        resultado[
-                            "categoria_final"
-                        ] = str(
-                            categoria_icecat
-                        )
+                    categoria_icecat = resultado_icecat.get("categoria_chipper")
+                    if categoria_icecat and categoria_icecat != "desconhecido":
+                        resultado["categoria_final"] = str(categoria_icecat)
 
             except ProductAPIError as erro:
-                resultado[
-                    "erros"
-                ].append(
+                resultado["erros"].append(
                     f"Icecat: {erro}"
                 )
 
             except Exception as erro:
-                resultado[
-                    "erros"
-                ].append(
+                resultado["erros"].append(
                     "Icecat: "
                     f"{type(erro).__name__}"
                 )
@@ -345,26 +271,12 @@ def resolver_produto_hibrido(
     # FALLBACK FINAL
     # ========================================================
 
-    if not resultado[
-        "fontes_utilizadas"
-    ]:
-        resultado[
-            "fontes_utilizadas"
-        ].append(
+    if not resultado["fontes_utilizadas"]:
+        resultado["fontes_utilizadas"].append(
             "Motor interno do CHIPPER"
         )
 
-    if (
-        resultado.get(
-            "categoria_final"
-        )
-        in {
-            None,
-            "",
-        }
-    ):
-        resultado[
-            "categoria_final"
-        ] = "desconhecido"
+    if resultado.get("categoria_final") in {None, ""}:
+        resultado["categoria_final"] = "desconhecido"
 
     return resultado
