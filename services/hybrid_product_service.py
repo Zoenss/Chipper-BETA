@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from services.api_service import (
@@ -7,26 +8,17 @@ from services.api_service import (
     buscar_detalhes_dispositivo,
     buscar_dispositivo,
 )
-
-from services.analysis_service import (
-    identificar_categoria_por_nome,
-)
-
-from services.catalog_service import (
-    buscar_produto_local,
-)
-
+from services.analysis_service import identificar_categoria_por_nome
+from services.catalog_service import buscar_produto_local
 from services.product_api_service import (
     ProductAPIError,
     buscar_produto_por_gtin,
+    buscar_produto_por_marca_codigo,
 )
 
 
 def _categoria_mobile(categoria: str) -> bool:
-    return categoria in {
-        "phone",
-        "tablet",
-    }
+    return categoria in {"phone", "tablet"}
 
 
 def _pontuacao_match(valor: Any) -> float:
@@ -57,42 +49,21 @@ def _normalizar_dados_mobile(dados: dict[str, Any]) -> dict[str, Any]:
 def _resumo_mobile(
     consulta: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """
-    Converte a resposta da MobileAPI para um formato
-    mais simples para o orquestrador híbrido.
-    """
-
-    if not consulta:
+    if not consulta or not consulta.get("encontrado"):
         return None
 
-    if not consulta.get("encontrado"):
-        return None
-
-    resultados = consulta.get(
-        "resultados",
-        {},
-    )
-
+    resultados = consulta.get("resultados", {})
     if not isinstance(resultados, dict):
         return None
 
-    dispositivos = resultados.get(
-        "devices",
-        [],
-    )
-
-    if not isinstance(dispositivos, list):
-        return None
-
-    if not dispositivos:
+    dispositivos = resultados.get("devices", [])
+    if not isinstance(dispositivos, list) or not dispositivos:
         return None
 
     melhor = max(
         dispositivos,
         key=lambda item: _pontuacao_match(
-            item.get("match_certainty")
-            if isinstance(item, dict)
-            else None
+            item.get("match_certainty") if isinstance(item, dict) else None
         ),
     )
 
@@ -106,43 +77,84 @@ def _resumo_mobile(
     }
 
 
-def resolver_produto_hibrido(
-    nome_produto: str,
-) -> dict[str, Any]:
-    """
-    Orquestra as fontes de identificação do CHIPPER.
+def _inferir_marca_codigo(nome: str) -> tuple[str | None, str | None]:
+    """Infere fabricante e um provável MPN/código a partir do nome digitado."""
 
-    Fluxo:
+    texto = " ".join(str(nome).strip().split())
+    if not texto:
+        return None, None
 
-    1. Identifica categoria pelo motor interno.
-    2. Consulta catálogo local.
-    3. Se for smartphone/tablet, tenta MobileAPI.
-    4. Quando a MobileAPI retorna um ID, busca a ficha detalhada.
-    5. Se o catálogo tiver GTIN, tenta Icecat.
-    6. Se nenhuma API localizar, mantém os dados
-       do catálogo local e do motor interno.
+    palavras = texto.split()
+    primeiro = palavras[0]
+    primeiro_lower = primeiro.lower()
 
-    A função não impede a análise caso uma API falhe.
-    """
+    aliases = {
+        "asus": "ASUS",
+        "acer": "Acer",
+        "dell": "Dell",
+        "lenovo": "Lenovo",
+        "hp": "HP",
+        "samsung": "Samsung",
+        "lg": "LG",
+        "sony": "Sony",
+        "playstation": "Sony",
+        "xbox": "Microsoft",
+        "microsoft": "Microsoft",
+        "nintendo": "Nintendo",
+        "aoc": "AOC",
+        "philips": "Philips",
+        "msi": "MSI",
+        "gigabyte": "Gigabyte",
+    }
 
-    nome = str(
-        nome_produto
-    ).strip()
+    marca = aliases.get(primeiro_lower, primeiro)
 
+    # Códigos de fabricante costumam ter letras e números juntos
+    # (ex.: X1504ZA, SM-S928B, 82RK00ABBR).
+    candidatos: list[str] = []
+    for token in reversed(palavras[1:]):
+        limpo = token.strip("(),;:/")
+        if not limpo:
+            continue
+        if re.search(r"[A-Za-z]", limpo) and re.search(r"\d", limpo):
+            candidatos.append(limpo)
+
+    codigo = candidatos[0] if candidatos else None
+    return marca, codigo
+
+
+def _aplicar_icecat(
+    resultado: dict[str, Any],
+    resultado_icecat: dict[str, Any],
+) -> None:
+    resultado["icecat"] = resultado_icecat
+
+    if not resultado_icecat.get("encontrado"):
+        erro = resultado_icecat.get("erro")
+        if erro:
+            resultado["erros"].append(f"Icecat: {erro}")
+        return
+
+    if "Icecat" not in resultado["fontes_utilizadas"]:
+        resultado["fontes_utilizadas"].append("Icecat")
+
+    resultado["fonte_principal"] = "Icecat"
+    resultado["encontrado"] = True
+
+    categoria_icecat = resultado_icecat.get("categoria_chipper")
+    if categoria_icecat and categoria_icecat != "desconhecido":
+        resultado["categoria_final"] = str(categoria_icecat)
+
+
+def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
+    """Orquestra catálogo local, MobileAPI, Icecat e motor interno."""
+
+    nome = str(nome_produto).strip()
     if not nome:
-        raise ValueError(
-            "Informe o nome do equipamento."
-        )
+        raise ValueError("Informe o nome do equipamento.")
 
-    categoria_interna = (
-        identificar_categoria_por_nome(
-            nome
-        )
-    )
-
-    produto_local = buscar_produto_local(
-        nome
-    )
+    categoria_interna = identificar_categoria_por_nome(nome)
+    produto_local = buscar_produto_local(nome)
 
     resultado: dict[str, Any] = {
         "encontrado": False,
@@ -157,29 +169,17 @@ def resolver_produto_hibrido(
         "erros": [],
     }
 
-    # ========================================================
     # CATÁLOGO LOCAL
-    # ========================================================
-
     if produto_local:
         resultado["fontes_utilizadas"].append("Catálogo local")
-
         categoria_catalogo = produto_local.get("categoria")
         if categoria_catalogo:
             resultado["categoria_final"] = str(categoria_catalogo)
-
         resultado["fonte_principal"] = "Catálogo local"
         resultado["encontrado"] = True
 
-    # ========================================================
-    # MOBILE API
-    # ========================================================
-
-    categoria_para_mobile = resultado.get(
-        "categoria_final",
-        categoria_interna,
-    )
-
+    # MOBILE API: smartphones/tablets ou categoria ainda desconhecida.
+    categoria_para_mobile = resultado.get("categoria_final", categoria_interna)
     deve_tentar_mobile = (
         _categoria_mobile(str(categoria_para_mobile))
         or str(categoria_para_mobile) == "desconhecido"
@@ -220,61 +220,61 @@ def resolver_produto_hibrido(
                     if isinstance(dados_mobile_final, dict)
                     else None
                 )
-
                 if categoria_mobile:
                     resultado["categoria_final"] = str(categoria_mobile)
 
         except MobileAPIError as erro:
-            resultado["erros"].append(
-                f"MobileAPI: {erro}"
-            )
-
+            resultado["erros"].append(f"MobileAPI: {erro}")
         except Exception as erro:
             resultado["erros"].append(
-                "MobileAPI: "
-                f"{type(erro).__name__}"
+                "MobileAPI: " f"{type(erro).__name__}"
             )
 
-    # ========================================================
-    # ICECAT
-    # ========================================================
-
+    # ICECAT por GTIN quando o catálogo local possuir identificador.
+    icecat_consultado = False
     if produto_local:
         gtin = produto_local.get("gtin")
-
         if gtin:
+            icecat_consultado = True
             try:
-                resultado_icecat = buscar_produto_por_gtin(str(gtin))
-                resultado["icecat"] = resultado_icecat
-
-                if resultado_icecat.get("encontrado"):
-                    resultado["fontes_utilizadas"].append("Icecat")
-                    resultado["fonte_principal"] = "Icecat"
-                    resultado["encontrado"] = True
-
-                    categoria_icecat = resultado_icecat.get("categoria_chipper")
-                    if categoria_icecat and categoria_icecat != "desconhecido":
-                        resultado["categoria_final"] = str(categoria_icecat)
-
-            except ProductAPIError as erro:
-                resultado["erros"].append(
-                    f"Icecat: {erro}"
+                _aplicar_icecat(
+                    resultado,
+                    buscar_produto_por_gtin(str(gtin)),
                 )
-
+            except ProductAPIError as erro:
+                resultado["erros"].append(f"Icecat: {erro}")
             except Exception as erro:
                 resultado["erros"].append(
-                    "Icecat: "
-                    f"{type(erro).__name__}"
+                    "Icecat: " f"{type(erro).__name__}"
                 )
 
-    # ========================================================
-    # FALLBACK FINAL
-    # ========================================================
+    # ICECAT por fabricante + provável MPN para notebooks, desktops,
+    # monitores e consoles fora do catálogo local (ou sem GTIN).
+    categoria_atual = str(resultado.get("categoria_final") or categoria_interna)
+    deve_tentar_icecat_mpn = (
+        not icecat_consultado
+        and categoria_atual in {"notebook", "desktop", "monitor", "console"}
+    )
 
+    if deve_tentar_icecat_mpn:
+        marca, codigo = _inferir_marca_codigo(nome)
+
+        if marca and codigo:
+            try:
+                _aplicar_icecat(
+                    resultado,
+                    buscar_produto_por_marca_codigo(marca, codigo),
+                )
+            except ProductAPIError as erro:
+                resultado["erros"].append(f"Icecat: {erro}")
+            except Exception as erro:
+                resultado["erros"].append(
+                    "Icecat: " f"{type(erro).__name__}"
+                )
+
+    # FALLBACK FINAL
     if not resultado["fontes_utilizadas"]:
-        resultado["fontes_utilizadas"].append(
-            "Motor interno do CHIPPER"
-        )
+        resultado["fontes_utilizadas"].append("Motor interno do CHIPPER")
 
     if resultado.get("categoria_final") in {None, ""}:
         resultado["categoria_final"] = "desconhecido"
