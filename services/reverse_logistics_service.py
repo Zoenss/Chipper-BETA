@@ -6,6 +6,12 @@ from typing import Any
 import requests
 import streamlit as st
 
+from services.geo_service import (
+    GeoServiceError,
+    geoapify_disponivel,
+    geocodificar_geoapify,
+)
+
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 OVERPASS_URLS = (
@@ -30,12 +36,7 @@ def _distancia_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * raio * math.asin(math.sqrt(a))
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def geocodificar_local(local: str) -> dict[str, Any]:
-    consulta = str(local).strip()
-    if not consulta:
-        raise ReverseLogisticsError("Informe uma cidade ou CEP.")
-
+def _geocodificar_nominatim(consulta: str) -> dict[str, Any]:
     try:
         resposta = requests.get(
             NOMINATIM_URL,
@@ -71,7 +72,25 @@ def geocodificar_local(local: str) -> dict[str, Any]:
         "latitude": latitude,
         "longitude": longitude,
         "nome": str(primeiro.get("display_name") or consulta),
+        "fonte_geocodificacao": "OpenStreetMap / Nominatim",
     }
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def geocodificar_local(local: str) -> dict[str, Any]:
+    consulta = str(local).strip()
+    if not consulta:
+        raise ReverseLogisticsError("Informe uma cidade ou CEP.")
+
+    # Geoapify é o provedor principal quando a chave estiver configurada.
+    # Em qualquer falha, o fluxo permanece resiliente pelo Nominatim.
+    if geoapify_disponivel():
+        try:
+            return geocodificar_geoapify(consulta)
+        except GeoServiceError:
+            pass
+
+    return _geocodificar_nominatim(consulta)
 
 
 def _endereco(tags: dict[str, Any]) -> str:
