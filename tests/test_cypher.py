@@ -2,7 +2,8 @@ import unittest
 from services.validation_service import validar_lote, extrair_massa_referencia_g
 from services.catalog_service import buscar_produto_local
 from services.analysis_service import estimar_analise, PERFIS, validar_percentuais
-from services.economic_service import calcular_valor_economico
+from services.economic_service import calcular_valor_economico, calcular_valor_material
+from services.export_service import gerar_csv_analise
 
 
 class TestCypher(unittest.TestCase):
@@ -37,6 +38,27 @@ class TestCypher(unittest.TestCase):
     def test_m55s_nao_e_m55(self):
         r = buscar_produto_local("Samsung Galaxy M55s 5G")
         self.assertTrue(r is None or "M55s" in r["nome"])
+
+    def test_formula_e_sem_preco(self):
+        calculado = calcular_valor_material("Ouro", 0.54)
+        self.assertIn("0.540000 g", calculado["formula"])
+        self.assertTrue(calculado["possui_preco"])
+        self.assertFalse(calcular_valor_material("Material não cadastrado", 2)["possui_preco"])
+
+    def test_csv_com_formula_e_indeterminado(self):
+        material = calcular_valor_material("Ouro", 0.54)
+        csv = gerar_csv_analise(
+            equipamento="Teste", quantidade=1, massa_total_g=180,
+            massa_media_g=180, categoria="phone", fonte_principal="Teste",
+            fontes_utilizadas=["Teste"], materiais=[{
+                "material": "Ouro", "percentual_estimado": 0.3, "massa_estimada_g": 0.54
+            }], materiais_economicos=[material], massa_recuperavel_g=None,
+            percentual_recuperavel=None, valor_total_estimado=243,
+            recomendacoes=[]
+        ).decode("utf-8-sig")
+        self.assertIn("formula_valor", csv)
+        self.assertIn("0.540000 g", csv)
+        self.assertIn("Não determinado", csv)
 
     def test_economia_nao_promete_liquido(self):
         r = calcular_valor_economico([{"material":"Ouro","massa_estimada_g":1.0}])
