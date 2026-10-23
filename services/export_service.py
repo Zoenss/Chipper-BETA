@@ -38,6 +38,9 @@ def gerar_csv_analise(
         "participacao_estimada_pct",
         "preco_referencia_rs_g",
         "valor_estimado_rs",
+        "formula_valor",
+        "preco_cadastrado",
+        "natureza_estimativa",
         "massa_recuperavel_g",
         "percentual_recuperavel",
         "valor_total_estimado_rs",
@@ -111,6 +114,9 @@ def gerar_csv_analise(
                     float(item.get("valor_estimado", 0.0)),
                     2,
                 ),
+                "formula_valor": item.get("formula", "Não calculado"),
+                "preco_cadastrado": ("Sim" if item.get("possui_preco") else "Não"),
+                "natureza_estimativa": "Simulação; composição e preços não verificados",
                 "massa_recuperavel_g": (round(float(massa_recuperavel_g), 4)
                                          if massa_recuperavel_g is not None else "Não determinado"),
                 "percentual_recuperavel": (round(float(percentual_recuperavel), 4)
