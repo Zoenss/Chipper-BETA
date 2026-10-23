@@ -16,12 +16,12 @@ def gerar_csv_analise(
     fontes_utilizadas: list[str],
     materiais: list[dict[str, Any]],
     materiais_economicos: list[dict[str, Any]],
-    massa_recuperavel_g: float,
-    percentual_recuperavel: float,
+    massa_recuperavel_g: float | None,
+    percentual_recuperavel: float | None,
     valor_total_estimado: float,
     recomendacoes: list[str],
 ) -> bytes:
-    """Gera o CSV da análise atual do CHIPPER em formato amigável ao Excel."""
+    """Gera o CSV do CYPHER, preservando resultados indeterminados."""
 
     saida = StringIO()
 
@@ -111,11 +111,10 @@ def gerar_csv_analise(
                     float(item.get("valor_estimado", 0.0)),
                     2,
                 ),
-                "massa_recuperavel_g": round(float(massa_recuperavel_g), 4),
-                "percentual_recuperavel": round(
-                    float(percentual_recuperavel),
-                    4,
-                ),
+                "massa_recuperavel_g": (round(float(massa_recuperavel_g), 4)
+                                         if massa_recuperavel_g is not None else "Não determinado"),
+                "percentual_recuperavel": (round(float(percentual_recuperavel), 4)
+                                            if percentual_recuperavel is not None else "Não determinado"),
                 "valor_total_estimado_rs": round(
                     float(valor_total_estimado),
                     2,
