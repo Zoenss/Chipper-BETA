@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import math
 
 
 # ============================================================
@@ -187,7 +188,7 @@ def calcular_valor_material(
 
     massa = float(massa_g)
 
-    if massa < 0:
+    if not math.isfinite(massa) or massa < 0:
         raise ValueError(
             "A massa do material não pode ser negativa."
         )
@@ -324,6 +325,9 @@ def calcular_valor_economico(
     return {
         "materiais": resultados,
 
+        "valor_bruto_estimado": round(valor_total, 2),
+        "retorno_liquido_estimado": None,
+        "custos_recuperacao_informados": False,
         "valor_total_estimado": round(
             valor_total,
             2,
