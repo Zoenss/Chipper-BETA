@@ -4,6 +4,7 @@ from services.catalog_service import buscar_produto_local
 from services.analysis_service import estimar_analise, PERFIS, validar_percentuais
 from services.economic_service import calcular_valor_economico, calcular_valor_material
 from services.export_service import gerar_csv_analise
+from services.analysis_service import validar_percentuais
 
 
 class TestCypher(unittest.TestCase):
@@ -59,6 +60,28 @@ class TestCypher(unittest.TestCase):
         self.assertIn("formula_valor", csv)
         self.assertIn("0.540000 g", csv)
         self.assertIn("Não determinado", csv)
+
+    def test_recuperacao_nao_inventada(self):
+        resultado = estimar_analise("phone", 1800)
+        self.assertIsNone(resultado["massa_recuperavel_g"])
+        self.assertIsNone(resultado["percentual_recuperavel"])
+
+    def test_exportacao_suspensa_sem_zero_falso(self):
+        csv = gerar_csv_analise(
+            equipamento="Teste", quantidade=10, massa_total_g=1800,
+            massa_media_g=180, categoria="phone", fonte_principal="Teste",
+            fontes_utilizadas=["Teste"],
+            materiais=[{"material": "Ouro", "massa_estimada_g": 0.54,
+                        "percentual_estimado": 0.03}],
+            materiais_economicos=[], massa_recuperavel_g=None,
+            percentual_recuperavel=None, valor_total_estimado=None,
+            recomendacoes=[]
+        ).decode("utf-8-sig")
+        self.assertIn("Não calculado", csv)
+
+    def test_perfil_percentual_negativo(self):
+        with self.assertRaises(ValueError):
+            validar_percentuais({"percentuais": {"Ouro": -0.1, "Outros": 1.1}})
 
     def test_economia_nao_promete_liquido(self):
         r = calcular_valor_economico([{"material":"Ouro","massa_estimada_g":1.0}])
