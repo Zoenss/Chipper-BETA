@@ -95,7 +95,7 @@ st.markdown(
 
             /* LOGO CYPHER */
             .logo {
-                font-family: "Brush Script MT", Brush Script Std, cursive;
+                font-family: "Arial Black", "Segoe UI", Arial, sans-serif;
                 font-size: 68px;
                 font-weight: 900;
                 letter-spacing: 12px;
