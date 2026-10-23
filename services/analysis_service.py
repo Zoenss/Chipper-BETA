@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import math
 
 
 PERFIS: dict[str, dict[str, Any]] = {
@@ -328,7 +329,7 @@ def estimar_analise(
     categoria: str | None,
     massa_g: float,
 ) -> dict[str, Any]:
-    if massa_g <= 0:
+    if not math.isfinite(float(massa_g)) or massa_g <= 0:
         raise ValueError("A massa deve ser maior que zero.")
 
     categoria_normalizada = normalizar_categoria(categoria)
@@ -341,7 +342,8 @@ def estimar_analise(
             "componentes": [],
             "materiais": [],
             "massa_recuperavel_g": 0.0,
-            "percentual_recuperavel": 0.0,
+            "percentual_recuperavel": None,
+            "recuperacao_confirmada": False,
             "recomendacoes": [
                 "Realizar inspeção técnica manual do equipamento.",
                 "Separar componentes funcionais.",
@@ -381,9 +383,12 @@ def estimar_analise(
         "componentes": list(perfil["componentes"]),
         "materiais": materiais,
         "massa_recuperavel_g": round(massa_recuperavel, 2),
-        "percentual_recuperavel": round(percentual_recuperavel * 100, 2),
+        "percentual_recuperavel": None,
+        "recuperacao_confirmada": False,
         "recomendacoes": gerar_recomendacoes(categoria_normalizada),
         "observacao": (
+             "Composição estimada por categoria; massa efetivamente recuperável "
+            "depende de processo, rendimento e inspeção. " 
             "Os resultados apresentados são estimativas calculadas "
             "pelo CHIPPER com base na categoria e na massa informada. "
             "Eles não representam desmontagem física, medição "
