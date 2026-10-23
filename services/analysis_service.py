@@ -341,7 +341,7 @@ def estimar_analise(
             "categoria_exibicao": "Equipamento eletrônico",
             "componentes": [],
             "materiais": [],
-            "massa_recuperavel_g": 0.0,
+            "massa_recuperavel_g": None,
             "percentual_recuperavel": None,
             "recuperacao_confirmada": False,
             "recomendacoes": [
@@ -382,7 +382,7 @@ def estimar_analise(
         "categoria_exibicao": perfil["nome"],
         "componentes": list(perfil["componentes"]),
         "materiais": materiais,
-        "massa_recuperavel_g": round(massa_recuperavel, 2),
+        "massa_recuperavel_g": massa_recuperavel,
         "percentual_recuperavel": None,
         "recuperacao_confirmada": False,
         "recomendacoes": gerar_recomendacoes(categoria_normalizada),
@@ -390,7 +390,7 @@ def estimar_analise(
              "Composição estimada por categoria; massa efetivamente recuperável "
             "depende de processo, rendimento e inspeção. " 
             "Os resultados apresentados são estimativas calculadas "
-            "pelo CHIPPER com base na categoria e na massa informada. "
+            "pelo CYPHER com base na categoria e na massa informada. "
             "Eles não representam desmontagem física, medição "
             "individual dos componentes ou análise laboratorial."
         ),
