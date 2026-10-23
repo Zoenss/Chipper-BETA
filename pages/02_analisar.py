@@ -453,6 +453,8 @@ elif dados_mobile or dados_icecat:
     )
 
 elif dados_catalogo:
+    if not dados_catalogo.get("confirmado", False):
+        st.warning("Identificação por nome aproximado: modelo NÃO CONFIRMADO. Confira o código exato do fabricante.")
     st.markdown(
         '<div class="card">'
         '<div class="card-title">ORIGEM DOS DADOS</div>'
@@ -912,7 +914,7 @@ with r1:
         '<div class="card">'
         '<div class="card-title">MASSA POTENCIALMENTE RECUPERÁVEL</div>'
         '<div class="metric-value">Não determinado</div>'
-        '<div class="metric-label">Estimativa baseada na massa total informada para o lote.</div>'
+        '<div class="metric-label">Sem taxas de recuperação verificadas.</div>'
         '</div>',
         unsafe_allow_html=True,
     )
