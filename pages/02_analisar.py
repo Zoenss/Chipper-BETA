@@ -865,7 +865,7 @@ else:
 
 st.markdown(
     '<div class="section-title">'
-    'Materiais potencialmente recuperáveis'
+    'Composição estimada dos materiais'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -903,9 +903,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-massa_recuperavel = float(
-    analise_estimada.get("massa_recuperavel_g", 0.0)
-)
+massa_recuperavel = analise_estimada.get("massa_recuperavel_g")
 percentual_recuperavel = analise_estimada.get("percentual_recuperavel")
 
 r1, r2 = st.columns(2)
