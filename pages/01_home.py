@@ -485,8 +485,8 @@ if st.session_state[
 
         'O CYPHER irá identificar o equipamento, '
         'consultar as fontes disponíveis e estimar '
-        'componentes, materiais recuperáveis, '
-        'potencial de recuperação e valor econômico.'
+        'componentes, composição estimada de materiais, '
+        'limitações de recuperação e valor bruto teórico.'
 
         '</div>'
 
