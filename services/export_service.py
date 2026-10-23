@@ -18,7 +18,7 @@ def gerar_csv_analise(
     materiais_economicos: list[dict[str, Any]],
     massa_recuperavel_g: float | None,
     percentual_recuperavel: float | None,
-    valor_total_estimado: float,
+    valor_total_estimado: float | None,
     recomendacoes: list[str],
 ) -> bytes:
     """Gera o CSV do CYPHER, preservando resultados indeterminados."""
@@ -65,12 +65,13 @@ def gerar_csv_analise(
     fontes_texto = " | ".join(str(fonte) for fonte in fontes_utilizadas)
     recomendacoes_texto = " | ".join(str(item) for item in recomendacoes)
 
-    linhas_economicas = materiais_economicos or [
+    # Sem valoração válida, não exportar preços zeros como se fossem cotações.
+    linhas_economicas = materiais_economicos if materiais_economicos else [
         {
             "material": item.get("material", "Não informado"),
             "massa_estimada_g": item.get("massa_estimada_g", 0.0),
-            "preco_por_grama": 0.0,
-            "valor_estimado": 0.0,
+            "preco_por_grama": None,
+            "valor_estimado": None,
         }
         for item in materiais
     ]
@@ -80,8 +81,8 @@ def gerar_csv_analise(
             {
                 "material": "Não informado",
                 "massa_estimada_g": 0.0,
-                "preco_por_grama": 0.0,
-                "valor_estimado": 0.0,
+                "preco_por_grama": None,
+                "valor_estimado": None,
             }
         ]
 
@@ -106,14 +107,10 @@ def gerar_csv_analise(
                     percentuais_por_material.get(material, 0.0),
                     4,
                 ),
-                "preco_referencia_rs_g": round(
-                    float(item.get("preco_por_grama", 0.0)),
-                    6,
-                ),
-                "valor_estimado_rs": round(
-                    float(item.get("valor_estimado", 0.0)),
-                    2,
-                ),
+                "preco_referencia_rs_g": (round(float(item["preco_por_grama"]), 6)
+                    if item.get("preco_por_grama") is not None else "Não calculado"),
+                "valor_estimado_rs": (round(float(item["valor_estimado"]), 2)
+                    if item.get("valor_estimado") is not None else "Não calculado"),
                 "formula_valor": item.get("formula", "Não calculado"),
                 "preco_cadastrado": ("Sim" if item.get("possui_preco") else "Não"),
                 "natureza_estimativa": "Simulação; composição e preços não verificados",
@@ -121,10 +118,8 @@ def gerar_csv_analise(
                                          if massa_recuperavel_g is not None else "Não determinado"),
                 "percentual_recuperavel": (round(float(percentual_recuperavel), 4)
                                             if percentual_recuperavel is not None else "Não determinado"),
-                "valor_total_estimado_rs": round(
-                    float(valor_total_estimado),
-                    2,
-                ),
+                "valor_total_estimado_rs": (round(float(valor_total_estimado), 2)
+                    if valor_total_estimado is not None else "Não calculado"),
                 "recomendacoes_logistica_reversa": recomendacoes_texto,
             }
         )
