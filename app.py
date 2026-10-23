@@ -4,7 +4,7 @@ import streamlit as st
 
 
 st.set_page_config(
-    page_title="Chipper",
+    page_title="CYPHER",
     page_icon="♻️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -91,8 +91,8 @@ st.markdown(
 
 st.markdown(
     '<div class="boot">'
-    '<div class="core">CHIPPER CORE SYSTEM</div>'
-    '<div class="logo" translate="no">CHIPPER</div>'
+    '<div class="core">CYPHER CORE SYSTEM</div>'
+    '<div class="logo" translate="no">CYPHER</div>'
     '<div class="subtitle">REVERSE LOGISTICS INTELLIGENCE</div>'
     '<div class="version">SYSTEM v2.0</div>'
     '</div>',
