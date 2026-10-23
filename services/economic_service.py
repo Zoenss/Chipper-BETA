@@ -5,7 +5,7 @@ import math
 
 
 # ============================================================
-# CHIPPER - ECONOMIC ENGINE
+# CYPHER - ECONOMIC ENGINE
 # ============================================================
 #
 # Responsável por transformar as massas estimadas pelo
@@ -131,7 +131,7 @@ ALIASES_MATERIAIS: dict[str, str] = {
 def normalizar_material(material: str) -> str:
     """
     Normaliza o nome recebido para o padrão utilizado
-    internamente pelo CHIPPER.
+    internamente pelo CYPHER.
     """
 
     if not material:
@@ -362,11 +362,12 @@ def calcular_valor_economico(
 
         "fonte_precos": (
             "Tabela interna de preços de referência "
-            "do CHIPPER"
+            "do CYPHER"
         ),
 
         "observacao": (
-            "O valor econômico apresentado é uma estimativa. "
+            "Simulação baseada em composição por categoria e preços internos não auditados; " 
+            "não representa cotação atual, rendimento nem receita de venda. "
             "O cálculo utiliza a massa estimada de cada material "
             "e preços internos de referência por grama. "
             "O valor real de recuperação pode variar conforme "
@@ -496,7 +497,7 @@ if __name__ == "__main__":
     )
 
     print("=" * 60)
-    print("CHIPPER - ECONOMIC ENGINE")
+    print("CYPHER - ECONOMIC ENGINE")
     print("=" * 60)
 
     for item in resultado["materiais"]:
