@@ -1019,19 +1019,16 @@ if materiais_economicos:
         hide_index=True,
     )
 
-valor_total = float(
-    analise_economica.get(
-        "valor_total_estimado",
-        0.0,
-    )
-)
+valor_total = (float(analise_economica.get("valor_total_estimado", 0.0))
+               if validacao["confiavel_para_valoracao"] and materiais_economicos
+               else None)
 
 st.markdown(
     '<div class="card">'
     '<div class="card-title">'
     'VALOR BRUTO TEÓRICO (NÃO É RECEITA DE VENDA)'
     '</div>'
-    f'<div class="metric-value">{formatar_real(valor_total)}</div>'
+    f'<div class="metric-value">{formatar_real(valor_total) if valor_total is not None else "Não calculado"}</div>'
     '<div class="metric-label">'
     'Estimativa baseada nos materiais identificados '
     'e nos preços internos de referência.'
