@@ -223,9 +223,9 @@ def calcular_valor_material(
             2,
         ),
 
-        "possui_preco": (
-            preco_por_grama > 0
-        ),
+        "possui_preco": material_normalizado in PRECOS_REFERENCIA,
+        "formula": f"{massa:.6f} g x R$ {preco_por_grama:.6f}/g",
+        "premissa_nao_validada": True,
     }
 
 
