@@ -4,10 +4,38 @@ from services.catalog_service import buscar_produto_local
 from services.analysis_service import estimar_analise, PERFIS, validar_percentuais
 from services.economic_service import calcular_valor_economico, calcular_valor_material
 from services.export_service import gerar_csv_analise
+from services.tales_service import gerar_resumo_tales
 from services.analysis_service import validar_percentuais
 
 
 class TestCypher(unittest.TestCase):
+    def test_tales_resumo_valido(self):
+        frases = gerar_resumo_tales(
+            equipamento_informado="Samsung M55 5G", modelo_identificado="Galaxy M55 5G",
+            quantidade=10, massa_total_g=1800, massa_media_g=180,
+            fontes=["Catálogo local", "MobileAPI"], alertas=[],
+            materiais=[{"material": "Ouro", "massa_estimada_g": 0.54}],
+            valor_bruto=339.12, massa_sem_preco_g=270.9,
+            massa_recuperavel_g=None, percentual_recuperavel=None,
+        )
+        texto = " ".join(frases)
+        self.assertIn("Galaxy M55 5G", texto)
+        self.assertIn("339,12", texto)
+        self.assertIn("não determinados", texto)
+
+    def test_tales_nao_inventa_valor_em_entrada_suspeita(self):
+        frases = gerar_resumo_tales(
+            equipamento_informado="Equipamento incerto", modelo_identificado=None,
+            quantidade=10, massa_total_g=20000, massa_media_g=2000,
+            fontes=[], alertas=["Massa incomum"], materiais=[],
+            valor_bruto=None, massa_sem_preco_g=None,
+            massa_recuperavel_g=None, percentual_recuperavel=None,
+        )
+        texto = " ".join(frases)
+        self.assertIn("Massa incomum", texto)
+        self.assertIn("não foi calculado", texto)
+        self.assertNotIn("R$ 0", texto)
+
     def test_lote_valido(self):
         r = validar_lote(10, 1800, "phone", 180)
         self.assertAlmostEqual(r["massa_media_g"], 180)
