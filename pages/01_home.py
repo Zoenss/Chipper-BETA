@@ -4,7 +4,7 @@ import streamlit as st
 
 
 st.set_page_config(
-    page_title="Chipper",
+    page_title="CYPHER",
     page_icon="♻️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -28,7 +28,7 @@ if "tales_aberto" not in st.session_state:
 # #0f172a = azul muito escuro
 # #0c4a6e = azul profundo
 #
-# #38bdf8 = azul principal do CHIPPER
+# #38bdf8 = azul principal do CYPHER
 # #22d3ee = ciano
 # #22c55e = verde / sucesso / reciclagem
 #
@@ -53,7 +53,7 @@ st.markdown(
                =================================================
                MEXE EM:
                - Cor de fundo da página inteira
-               - Iluminação atrás do CHIPPER
+               - Iluminação atrás do CYPHER
                - Atmosfera geral do sistema
                ================================================= */
 
@@ -93,7 +93,7 @@ st.markdown(
                 margin-bottom: 35px;
             }
 
-            /* LOGO CHIPPER */
+            /* LOGO CYPHER */
             .logo {
                 font-family: "Brush Script MT", Brush Script Std, cursive;
                 font-size: 68px;
@@ -273,7 +273,7 @@ st.markdown(
                 line-height: 1.6;
             }
 
-            /* RODAPÉ DO CHIPPER */
+            /* RODAPÉ DO CYPHER */
             .footer {
                 text-align: center;
                 color: #475569;
@@ -294,7 +294,7 @@ st.markdown(
 # =========================
 st.markdown(
     '<div class="hero">'
-    '<div class="logo" translate="no">CHIPPER</div>'
+    '<div class="logo" translate="no">CYPHER</div>'
     '<div class="subtitle">'
     'REVERSE LOGISTICS INTELLIGENCE'
     '</div>'
@@ -462,7 +462,7 @@ if st.session_state[
         '</div>'
 
         '<div class="tales-subtitle">'
-        'ASSISTENTE CHIPPER'
+        'ASSISTENTE CYPHER'
         '</div>'
 
         '<div class="tales-text">'
@@ -483,7 +483,7 @@ if st.session_state[
         'Clique em '
         '<strong>INICIAR ANÁLISE</strong>.<br><br>'
 
-        'O CHIPPER irá identificar o equipamento, '
+        'O CYPHER irá identificar o equipamento, '
         'consultar as fontes disponíveis e estimar '
         'componentes, materiais recuperáveis, '
         'potencial de recuperação e valor econômico.'
@@ -506,7 +506,7 @@ if st.session_state[
 # =========================
 st.markdown(
     '<div class="footer">'
-    'CHIPPER CORE • MATERIAL INTELLIGENCE • Chipper International • 2026 • '
+    'CYPHER CORE • MATERIAL INTELLIGENCE • CYPHER International • 2026 • '
     'REVERSE LOGISTICS'
     '</div>',
     unsafe_allow_html=True,
