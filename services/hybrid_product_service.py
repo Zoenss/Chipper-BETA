@@ -79,8 +79,8 @@ def _modelo_compativel(consulta: str, candidato: str) -> bool:
     if not a or not b:
         return False
     # M55 e M55s são diferentes. O token do modelo deve coincidir exatamente.
-    model_a = [x for x in a if re.search(r"\\d", x)]
-    model_b = [x for x in b if re.search(r"\\d", x)]
+    model_a = [x for x in a if re.search(r"\d", x)]
+    model_b = [x for x in b if re.search(r"\d", x)]
     if not model_a or not model_b:
         return False
     return model_a == model_b
