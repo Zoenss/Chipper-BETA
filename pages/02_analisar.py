@@ -1137,7 +1137,7 @@ with col_exportar:
     )
 
     nome_arquivo = (
-        "chipper_"
+        "cypher_"
         + "".join(
             caractere.lower() if caractere.isalnum() else "_"
             for caractere in nome_aparelho
