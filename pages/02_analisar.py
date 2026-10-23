@@ -4,6 +4,7 @@ from typing import Any
 import streamlit as st
 
 from services.analysis_service import estimar_analise
+from services.validation_service import validar_lote, extrair_massa_referencia_g
 from services.economic_service import (
     calcular_valor_economico,
     formatar_real,
@@ -13,7 +14,7 @@ from services.hybrid_product_service import resolver_produto_hibrido
 
 
 st.set_page_config(
-    page_title="Chipper - Análise",
+    page_title="CYPHER - Análise",
     page_icon="⚙️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -326,8 +327,8 @@ if resultado_hibrido is None:
     resultado_hibrido = {
         "encontrado": False,
         "categoria_final": "desconhecido",
-        "fonte_principal": "Motor interno do CHIPPER",
-        "fontes_utilizadas": ["Motor interno do CHIPPER"],
+        "fonte_principal": "Motor interno do CYPHER",
+        "fontes_utilizadas": ["Motor interno do CYPHER"],
         "catalogo_local": None,
         "mobileapi": None,
         "icecat": None,
@@ -345,7 +346,7 @@ categoria_analise = str(
 origem_categoria = str(
     resultado_hibrido.get(
         "fonte_principal",
-        "Motor interno do CHIPPER",
+        "Motor interno do CYPHER",
     )
 )
 
@@ -385,6 +386,24 @@ if isinstance(catalogo_info, dict):
 
 
 # ==================================================
+# VALIDAÇÃO CONSERVADORA DO LOTE
+# ==================================================
+referencia = None
+if isinstance(dados_mobile, dict):
+    referencia = extrair_massa_referencia_g(dados_mobile.get("weight"))
+if referencia is None and isinstance(dados_catalogo, dict):
+    referencia = extrair_massa_referencia_g(dados_catalogo.get("peso"))
+try:
+    validacao = validar_lote(quantidade, massa_total, categoria_analise, referencia)
+except ValueError as erro:
+    st.error(str(erro))
+    st.stop()
+for aviso in validacao["alertas"]:
+    st.error("ENTRADA SUSPEITA — " + aviso)
+if validacao["alertas"]:
+    st.warning("A composição é apenas ilustrativa. A valoração financeira foi suspensa até corrigir os dados.")
+
+# ==================================================
 # MOTOR DE ANÁLISE
 # ==================================================
 try:
@@ -403,7 +422,7 @@ except ValueError as erro:
 fontes_texto = ", ".join(
     str(fonte)
     for fonte in fontes_utilizadas
-) or "Motor interno do CHIPPER"
+) or "Motor interno do CYPHER"
 
 if erro_hibrido:
     st.markdown(
@@ -412,7 +431,7 @@ if erro_hibrido:
         '<div class="source-error">Sistema híbrido com falha parcial</div>'
         f'<div class="small-text">{escape(erro_hibrido)}</div>'
         '<div class="small-text">'
-        'A análise foi mantida pelo motor interno do CHIPPER.'
+        'A análise foi mantida pelo motor interno do CYPHER.'
         '</div>'
         '</div>',
         unsafe_allow_html=True,
@@ -427,7 +446,7 @@ elif dados_mobile or dados_icecat:
         '<div class="small-text">'
         'A ficha técnica externa complementa a identificação. '
         'Componentes, materiais, massas e recomendações continuam '
-        'sendo estimados pelo motor CHIPPER.'
+        'sendo estimados pelo motor CYPHER.'
         '</div>'
         '</div>',
         unsafe_allow_html=True,
@@ -452,7 +471,7 @@ else:
     st.markdown(
         '<div class="card">'
         '<div class="card-title">ORIGEM DOS DADOS</div>'
-        '<div class="source-warning">Análise interna do CHIPPER</div>'
+        '<div class="source-warning">Análise interna do CYPHER</div>'
         f'<div class="small-text">Fontes utilizadas: {escape(fontes_texto)}.</div>'
         '<div class="small-text">'
         'Nenhuma ficha técnica externa foi localizada, '
@@ -687,7 +706,7 @@ elif dados_icecat:
 
     with c3:
         st.markdown(
-            '<div class="card"><div class="card-title">CATEGORIA CHIPPER</div>'
+            '<div class="card"><div class="card-title">CATEGORIA CYPHER</div>'
             f'<div class="technical-value">{escape(categoria_exibicao)}</div>'
             '</div>',
             unsafe_allow_html=True,
@@ -851,7 +870,7 @@ st.markdown(
 
 materiais = analise_estimada.get("materiais", [])
 analise_economica = calcular_valor_economico(
-    materiais
+    materiais if validacao["confiavel_para_valoracao"] else []
 )
 
 if materiais:
@@ -885,16 +904,14 @@ st.markdown(
 massa_recuperavel = float(
     analise_estimada.get("massa_recuperavel_g", 0.0)
 )
-percentual_recuperavel = float(
-    analise_estimada.get("percentual_recuperavel", 0.0)
-)
+percentual_recuperavel = analise_estimada.get("percentual_recuperavel")
 
 r1, r2 = st.columns(2)
 with r1:
     st.markdown(
         '<div class="card">'
         '<div class="card-title">MASSA POTENCIALMENTE RECUPERÁVEL</div>'
-        f'<div class="metric-value">{massa_recuperavel:.2f} g</div>'
+        '<div class="metric-value">Não determinado</div>'
         '<div class="metric-label">Estimativa baseada na massa total informada para o lote.</div>'
         '</div>',
         unsafe_allow_html=True,
@@ -903,9 +920,9 @@ with r2:
     st.markdown(
         '<div class="card">'
         '<div class="card-title">PERCENTUAL POTENCIALMENTE RECUPERÁVEL</div>'
-        f'<div class="metric-value">{percentual_recuperavel:.2f}%</div>'
+        '<div class="metric-value">Não determinado</div>'
         '<div class="metric-label">'
-        'Percentual aproximado do perfil da categoria.'
+        'Não confundir composição teórica com recuperação efetiva.'
         '</div>'
         '</div>',
         unsafe_allow_html=True,
@@ -987,6 +1004,8 @@ if materiais_economicos:
                     float(item.get("preco_por_grama", 0.0)),
                     4,
                 ),
+                "Cálculo": item.get("formula", ""),
+                "Preço cadastrado": "Sim" if item.get("possui_preco") else "Não",
                 "Valor estimado (R$)": round(
                     float(item.get("valor_estimado", 0.0)),
                     2,
@@ -1010,7 +1029,7 @@ valor_total = float(
 st.markdown(
     '<div class="card">'
     '<div class="card-title">'
-    'VALOR ECONÔMICO TOTAL ESTIMADO'
+    'VALOR BRUTO TEÓRICO (NÃO É RECEITA DE VENDA)'
     '</div>'
     f'<div class="metric-value">{formatar_real(valor_total)}</div>'
     '<div class="metric-label">'
@@ -1020,6 +1039,10 @@ st.markdown(
     '</div>',
     unsafe_allow_html=True,
 )
+
+st.info("Retorno financeiro líquido: não calculado — faltam rendimentos de recuperação, custos operacionais e condições reais de venda. Os preços são referências internas, não cotações verificadas.")
+if not validacao["confiavel_para_valoracao"]:
+    st.error("Valor bruto indisponível: entrada suspeita. Corrija a massa ou quantidade antes de considerar uma avaliação.")
 
 massa_precificada = float(
     analise_economica.get(
@@ -1080,7 +1103,7 @@ st.markdown(
 st.caption(
     "Ficha técnica: MobileAPI, Icecat ou catálogo local, quando disponíveis. "
     "Componentes, materiais, massas, recomendações e valor econômico: "
-    "estimativas calculadas pelo motor CHIPPER."
+    "estimativas calculadas pelo motor CYPHER."
 )
 
 col_voltar, col_descartar, col_exportar = st.columns(3)
