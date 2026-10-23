@@ -319,6 +319,8 @@ def gerar_recomendacoes(categoria: str) -> list[str]:
 def validar_percentuais(perfil: dict[str, Any]) -> None:
     total = sum(float(valor) for valor in perfil["percentuais"].values())
 
+    if any(not math.isfinite(float(v)) or float(v) < 0 or float(v) > 1 for v in perfil["percentuais"].values()):
+        raise ValueError("Perfil com participação inválida.")
     if abs(total - 1.0) > 0.0001:
         raise ValueError(
             f"Os percentuais do perfil somam {total:.6f}, e deveriam somar 1.0."
@@ -329,7 +331,7 @@ def estimar_analise(
     categoria: str | None,
     massa_g: float,
 ) -> dict[str, Any]:
-    if not math.isfinite(float(massa_g)) or massa_g <= 0:
+    if not math.isfinite(float(massa_g)) or float(massa_g) <= 0:
         raise ValueError("A massa deve ser maior que zero.")
 
     categoria_normalizada = normalizar_categoria(categoria)
@@ -370,12 +372,8 @@ def estimar_analise(
             }
         )
 
-    percentual_outros = float(
-        perfil["percentuais"].get("Outros materiais", 0.0)
-    )
-
-    percentual_recuperavel = max(0.0, 1.0 - percentual_outros)
-    massa_recuperavel = massa_g * percentual_recuperavel
+    # Massa recuperável exige rendimento de processo verificado.
+    massa_recuperavel = None
 
     return {
         "categoria": categoria_normalizada,
