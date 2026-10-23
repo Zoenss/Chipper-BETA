@@ -11,6 +11,7 @@ from services.economic_service import (
 )
 from services.export_service import gerar_csv_analise
 from services.hybrid_product_service import resolver_produto_hibrido
+from services.tales_service import gerar_resumo_tales
 
 
 st.set_page_config(
@@ -1102,6 +1103,32 @@ st.caption(
     "Componentes, materiais, massas, recomendações e valor econômico: "
     "estimativas calculadas pelo motor CYPHER."
 )
+
+# Tales usa os dados desta análise, sem solicitar novas APIs ou inventar números.
+modelo_tales = None
+if isinstance(dados_mobile, dict):
+    modelo_tales = dados_mobile.get("name")
+if not modelo_tales and isinstance(dados_catalogo, dict):
+    modelo_tales = dados_catalogo.get("nome")
+
+with st.expander("🤖 Tales explica sua análise", expanded=True):
+    st.image("assets/tales.png", width=85)
+    falas_tales = gerar_resumo_tales(
+        equipamento_informado=nome_aparelho,
+        modelo_identificado=str(modelo_tales) if modelo_tales else None,
+        quantidade=quantidade,
+        massa_total_g=massa_total,
+        massa_media_g=massa_media,
+        fontes=fontes_utilizadas,
+        alertas=validacao["alertas"],
+        materiais=materiais,
+        valor_bruto=valor_total,
+        massa_sem_preco_g=massa_sem_preco if valor_total is not None else None,
+        massa_recuperavel_g=massa_recuperavel,
+        percentual_recuperavel=percentual_recuperavel,
+    )
+    for fala in falas_tales:
+        st.write(fala)
 
 col_voltar, col_descartar, col_exportar = st.columns(3)
 
