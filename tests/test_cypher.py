@@ -20,6 +20,20 @@ class TestCypher(unittest.TestCase):
             self.assertNotIn("Resumo genérico", resposta)
             self.assertIn("Local", fonte)
 
+    def test_componentes_nao_confirmados(self):
+        estimativa = estimar_analise("phone", 180)
+        self.assertEqual(estimativa["componentes_confirmados"], [])
+        self.assertIn("Tela", estimativa["componentes_nao_confirmados"])
+        frases = gerar_resumo_tales(
+            equipamento_informado="Samsung", modelo_identificado=None,
+            quantidade=1, massa_total_g=180, massa_media_g=180,
+            fontes=[], alertas=[], materiais=estimativa["materiais"],
+            valor_bruto=None, massa_sem_preco_g=None,
+            massa_recuperavel_g=None, percentual_recuperavel=None,
+            componentes_nao_confirmados=estimativa["componentes_nao_confirmados"]
+        )
+        self.assertIn("não foram confirmados", " ".join(frases))
+
     def test_tales_interativo_local(self):
         resposta, origem = responder_tales(
             "Qual foi o valor?", ["O valor bruto teórico é R$ 339,12.", "Recuperação indeterminada."],
