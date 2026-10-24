@@ -12,6 +12,14 @@ from services.analysis_service import validar_percentuais
 
 
 class TestCypher(unittest.TestCase):
+    def test_tales_orienta_logistica_reversa(self):
+        for pergunta in ("Como posso iniciar a logística reversa?", "Quais os primeiros passos?", "Como descartar eletrônicos?"):
+            resposta, fonte = responder_tales(pergunta, ["Resumo genérico."], usar_ia=False)
+            self.assertIn("Inventarie", resposta)
+            self.assertIn("operador de logística reversa", resposta)
+            self.assertNotIn("Resumo genérico", resposta)
+            self.assertIn("Local", fonte)
+
     def test_tales_interativo_local(self):
         resposta, origem = responder_tales(
             "Qual foi o valor?", ["O valor bruto teórico é R$ 339,12.", "Recuperação indeterminada."],
