@@ -4,16 +4,22 @@ from typing import Any
 import streamlit as st
 
 from services.analysis_service import estimar_analise
+from services.validation_service import validar_lote, extrair_massa_referencia_g
 from services.economic_service import (
     calcular_valor_economico,
     formatar_real,
 )
 from services.export_service import gerar_csv_analise
 from services.hybrid_product_service import resolver_produto_hibrido
+from services.tales_service import gerar_resumo_tales
+from services.tales_chat_service import responder_tales, _chave_gemini
+from services.material_guidance_service import orientar_materiais
+from services.tales_persona import EXPLICACAO_RECUPERACAO, APRESENTACAO_TALES
+from services.theme_service import seletor_tema
 
 
 st.set_page_config(
-    page_title="Chipper - Análise",
+    page_title="CYPHER - Análise",
     page_icon="⚙️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -252,6 +258,7 @@ if (
 nome_aparelho = str(aparelho).strip()
 massa_total = float(peso)
 massa_media = massa_total / quantidade
+seletor_tema()
 nome_aparelho_seguro = escape(nome_aparelho)
 
 st.markdown(
@@ -326,8 +333,8 @@ if resultado_hibrido is None:
     resultado_hibrido = {
         "encontrado": False,
         "categoria_final": "desconhecido",
-        "fonte_principal": "Motor interno do CHIPPER",
-        "fontes_utilizadas": ["Motor interno do CHIPPER"],
+        "fonte_principal": "Motor interno do CYPHER",
+        "fontes_utilizadas": ["Motor interno do CYPHER"],
         "catalogo_local": None,
         "mobileapi": None,
         "icecat": None,
@@ -345,7 +352,7 @@ categoria_analise = str(
 origem_categoria = str(
     resultado_hibrido.get(
         "fonte_principal",
-        "Motor interno do CHIPPER",
+        "Motor interno do CYPHER",
     )
 )
 
@@ -356,6 +363,14 @@ fontes_utilizadas = resultado_hibrido.get(
 
 if not isinstance(fontes_utilizadas, list):
     fontes_utilizadas = []
+
+if isinstance(resultado_hibrido.get("wikidata"), dict) and resultado_hibrido["wikidata"].get("encontrado"):
+    nome_wikidata = str(resultado_hibrido["wikidata"].get("nome") or "Modelo")
+    st.info(
+        "Wikidata encontrou uma identificação complementar: " + nome_wikidata +
+        ". Essa fonte não confirma massa, componentes nem ficha técnica. "
+        "A composição permanece estimada por categoria."
+    )
 
 erros_fontes = resultado_hibrido.get(
     "erros",
@@ -385,6 +400,24 @@ if isinstance(catalogo_info, dict):
 
 
 # ==================================================
+# VALIDAÇÃO CONSERVADORA DO LOTE
+# ==================================================
+referencia = None
+if isinstance(dados_mobile, dict):
+    referencia = extrair_massa_referencia_g(dados_mobile.get("weight"))
+if referencia is None and isinstance(dados_catalogo, dict):
+    referencia = extrair_massa_referencia_g(dados_catalogo.get("peso"))
+try:
+    validacao = validar_lote(quantidade, massa_total, categoria_analise, referencia)
+except ValueError as erro:
+    st.error(str(erro))
+    st.stop()
+for aviso in validacao["alertas"]:
+    st.error("ENTRADA SUSPEITA — " + aviso)
+if validacao["alertas"]:
+    st.warning("A composição é apenas ilustrativa. A valoração financeira foi suspensa até corrigir os dados.")
+
+# ==================================================
 # MOTOR DE ANÁLISE
 # ==================================================
 try:
@@ -403,7 +436,7 @@ except ValueError as erro:
 fontes_texto = ", ".join(
     str(fonte)
     for fonte in fontes_utilizadas
-) or "Motor interno do CHIPPER"
+) or "Motor interno do CYPHER"
 
 if erro_hibrido:
     st.markdown(
@@ -412,7 +445,7 @@ if erro_hibrido:
         '<div class="source-error">Sistema híbrido com falha parcial</div>'
         f'<div class="small-text">{escape(erro_hibrido)}</div>'
         '<div class="small-text">'
-        'A análise foi mantida pelo motor interno do CHIPPER.'
+        'A análise foi mantida pelo motor interno do CYPHER.'
         '</div>'
         '</div>',
         unsafe_allow_html=True,
@@ -427,13 +460,15 @@ elif dados_mobile or dados_icecat:
         '<div class="small-text">'
         'A ficha técnica externa complementa a identificação. '
         'Componentes, materiais, massas e recomendações continuam '
-        'sendo estimados pelo motor CHIPPER.'
+        'sendo estimados pelo motor CYPHER.'
         '</div>'
         '</div>',
         unsafe_allow_html=True,
     )
 
 elif dados_catalogo:
+    if not dados_catalogo.get("confirmado", False):
+        st.warning("Identificação por nome aproximado: modelo NÃO CONFIRMADO. Confira o código exato do fabricante.")
     st.markdown(
         '<div class="card">'
         '<div class="card-title">ORIGEM DOS DADOS</div>'
@@ -452,7 +487,7 @@ else:
     st.markdown(
         '<div class="card">'
         '<div class="card-title">ORIGEM DOS DADOS</div>'
-        '<div class="source-warning">Análise interna do CHIPPER</div>'
+        '<div class="source-warning">Análise interna do CYPHER</div>'
         f'<div class="small-text">Fontes utilizadas: {escape(fontes_texto)}.</div>'
         '<div class="small-text">'
         'Nenhuma ficha técnica externa foi localizada, '
@@ -687,7 +722,7 @@ elif dados_icecat:
 
     with c3:
         st.markdown(
-            '<div class="card"><div class="card-title">CATEGORIA CHIPPER</div>'
+            '<div class="card"><div class="card-title">CATEGORIA CYPHER</div>'
             f'<div class="technical-value">{escape(categoria_exibicao)}</div>'
             '</div>',
             unsafe_allow_html=True,
@@ -832,6 +867,8 @@ st.markdown(
 
 componentes = analise_estimada.get("componentes", [])
 if componentes:
+    st.caption("Componentes prováveis pelo perfil da categoria; presença e especificações não confirmadas individualmente.")
+if componentes:
     st.markdown(
         '<div class="card">'
         '<div class="card-title">COMPONENTES PROVÁVEIS</div>'
@@ -844,14 +881,14 @@ else:
 
 st.markdown(
     '<div class="section-title">'
-    'Materiais potencialmente recuperáveis'
+    'Composição estimada dos materiais'
     '</div>',
     unsafe_allow_html=True,
 )
 
 materiais = analise_estimada.get("materiais", [])
 analise_economica = calcular_valor_economico(
-    materiais
+    materiais if validacao["confiavel_para_valoracao"] else []
 )
 
 if materiais:
@@ -882,20 +919,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-massa_recuperavel = float(
-    analise_estimada.get("massa_recuperavel_g", 0.0)
-)
-percentual_recuperavel = float(
-    analise_estimada.get("percentual_recuperavel", 0.0)
-)
+massa_recuperavel = analise_estimada.get("massa_recuperavel_g")
+percentual_recuperavel = analise_estimada.get("percentual_recuperavel")
 
 r1, r2 = st.columns(2)
 with r1:
     st.markdown(
         '<div class="card">'
         '<div class="card-title">MASSA POTENCIALMENTE RECUPERÁVEL</div>'
-        f'<div class="metric-value">{massa_recuperavel:.2f} g</div>'
-        '<div class="metric-label">Estimativa baseada na massa total informada para o lote.</div>'
+        '<div class="metric-value">Não determinado</div>'
+        '<div class="metric-label">Sem taxas de recuperação verificadas.</div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -903,13 +936,15 @@ with r2:
     st.markdown(
         '<div class="card">'
         '<div class="card-title">PERCENTUAL POTENCIALMENTE RECUPERÁVEL</div>'
-        f'<div class="metric-value">{percentual_recuperavel:.2f}%</div>'
+        '<div class="metric-value">Não determinado</div>'
         '<div class="metric-label">'
-        'Percentual aproximado do perfil da categoria.'
+        'Não confundir composição teórica com recuperação efetiva.'
         '</div>'
         '</div>',
         unsafe_allow_html=True,
     )
+
+st.info("🤖 Tales explica: " + EXPLICACAO_RECUPERACAO)
 
 st.markdown(
     '<div class="section-title">'
@@ -987,6 +1022,8 @@ if materiais_economicos:
                     float(item.get("preco_por_grama", 0.0)),
                     4,
                 ),
+                "Cálculo": item.get("formula", ""),
+                "Preço cadastrado": "Sim" if item.get("possui_preco") else "Não",
                 "Valor estimado (R$)": round(
                     float(item.get("valor_estimado", 0.0)),
                     2,
@@ -1000,19 +1037,16 @@ if materiais_economicos:
         hide_index=True,
     )
 
-valor_total = float(
-    analise_economica.get(
-        "valor_total_estimado",
-        0.0,
-    )
-)
+valor_total = (float(analise_economica.get("valor_total_estimado", 0.0))
+               if validacao["confiavel_para_valoracao"] and materiais_economicos
+               else None)
 
 st.markdown(
     '<div class="card">'
     '<div class="card-title">'
-    'VALOR ECONÔMICO TOTAL ESTIMADO'
+    'VALOR BRUTO TEÓRICO (NÃO É RECEITA DE VENDA)'
     '</div>'
-    f'<div class="metric-value">{formatar_real(valor_total)}</div>'
+    f'<div class="metric-value">{formatar_real(valor_total) if valor_total is not None else "Não calculado"}</div>'
     '<div class="metric-label">'
     'Estimativa baseada nos materiais identificados '
     'e nos preços internos de referência.'
@@ -1020,6 +1054,10 @@ st.markdown(
     '</div>',
     unsafe_allow_html=True,
 )
+
+st.info("Retorno financeiro líquido: não calculado — faltam rendimentos de recuperação, custos operacionais e condições reais de venda. Os preços são referências internas, não cotações verificadas.")
+if not validacao["confiavel_para_valoracao"]:
+    st.error("Valor bruto indisponível: entrada suspeita. Corrija a massa ou quantidade antes de considerar uma avaliação.")
 
 massa_precificada = float(
     analise_economica.get(
@@ -1080,8 +1118,60 @@ st.markdown(
 st.caption(
     "Ficha técnica: MobileAPI, Icecat ou catálogo local, quando disponíveis. "
     "Componentes, materiais, massas, recomendações e valor econômico: "
-    "estimativas calculadas pelo motor CHIPPER."
+    "estimativas calculadas pelo motor CYPHER."
 )
+
+# Tales usa os dados desta análise, sem solicitar novas APIs ou inventar números.
+modelo_tales = None
+if isinstance(dados_mobile, dict):
+    modelo_tales = dados_mobile.get("name")
+if not modelo_tales and isinstance(dados_catalogo, dict):
+    modelo_tales = dados_catalogo.get("nome")
+
+with st.expander("🤖 Tales explica sua análise", expanded=True):
+    st.image("assets/tales.png", width=85)
+    st.caption(APRESENTACAO_TALES)
+    falas_tales = gerar_resumo_tales(
+        equipamento_informado=nome_aparelho,
+        modelo_identificado=str(modelo_tales) if modelo_tales else None,
+        quantidade=quantidade,
+        massa_total_g=massa_total,
+        massa_media_g=massa_media,
+        fontes=fontes_utilizadas,
+        alertas=validacao["alertas"],
+        materiais=materiais,
+        valor_bruto=valor_total,
+        massa_sem_preco_g=massa_sem_preco if valor_total is not None else None,
+        massa_recuperavel_g=massa_recuperavel,
+        percentual_recuperavel=percentual_recuperavel,
+        componentes_nao_confirmados=analise_estimada.get("componentes_nao_confirmados", []),
+    )
+    for fala in falas_tales:
+        st.write(fala)
+    with st.expander("♻️ O que fazer com cada material?", expanded=False):
+        st.caption("Orientações gerais para materiais estimados; não confirmam sua presença ou uma rota local de coleta.")
+        for linha in orientar_materiais(materiais):
+            st.markdown(f"**{linha['material']}** — {linha['orientacao']}")
+    st.markdown("**Pergunte ao Tales sobre esta análise**")
+    pergunta_tales = st.text_input(
+        "Sua pergunta", key="pergunta_tales",
+        placeholder="Ex.: Como foi calculado o valor bruto?"
+    )
+    ia_disponivel = bool(_chave_gemini())
+    usar_ia_tales = st.checkbox(
+        "Usar IA para explicar (Gemini)", value=False,
+        disabled=not ia_disponivel,
+        help="Opcional; sem chave GEMINI_API_KEY o Tales responde com dados locais.",
+    )
+    if st.button("PERGUNTAR AO TALES") and pergunta_tales.strip():
+        resposta_tales, origem_tales = responder_tales(
+            pergunta_tales, falas_tales, usar_ia=usar_ia_tales
+        )
+        st.info(resposta_tales)
+        st.caption("Origem: " + origem_tales)
+    if not ia_disponivel:
+        st.caption("IA opcional não configurada. Tales continua disponível em modo local.")
+
 
 col_voltar, col_descartar, col_exportar = st.columns(3)
 
@@ -1114,7 +1204,7 @@ with col_exportar:
     )
 
     nome_arquivo = (
-        "chipper_"
+        "cypher_"
         + "".join(
             caractere.lower() if caractere.isalnum() else "_"
             for caractere in nome_aparelho

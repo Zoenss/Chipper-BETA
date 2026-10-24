@@ -100,11 +100,8 @@ PRODUTOS: list[dict[str, Any]] = [
         "nome": "Samsung Galaxy M55 5G",
         "aliases": [
             "Samsung M55 5G",
-            "Samsung Galaxy M55",
             "Galaxy M55 5G",
-            "Galaxy M55",
             "M55 5G",
-            "M55",
         ],
         "fabricante": "Samsung",
         "categoria": "phone",
@@ -231,6 +228,7 @@ def buscar_produto_local(
                 resultado[
                     "tipo_correspondencia"
                 ] = "exata"
+                resultado["confirmado"] = True
 
                 return resultado
 
@@ -246,6 +244,11 @@ def buscar_produto_local(
                 candidato
             )
 
+            # Nunca confundir variante M55 5G com M55s 5G.
+            if ("m55s" in consulta) != ("m55s" in candidato_normalizado):
+                continue
+            if ("m55" in consulta) != ("m55" in candidato_normalizado):
+                continue
             if len(consulta) < 5:
                 continue
 
@@ -258,6 +261,7 @@ def buscar_produto_local(
                     "tipo_correspondencia"
                 ] = "consulta_contida"
 
+                resultado["confirmado"] = False
                 return resultado
 
             if candidato_normalizado in consulta:
@@ -265,6 +269,7 @@ def buscar_produto_local(
                 resultado[
                     "tipo_correspondencia"
                 ] = "produto_contido"
+                resultado["confirmado"] = False
 
                 return resultado
 

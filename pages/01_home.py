@@ -1,10 +1,11 @@
 from textwrap import dedent
 
 import streamlit as st
+from services.theme_service import seletor_tema
 
 
 st.set_page_config(
-    page_title="Chipper",
+    page_title="CYPHER",
     page_icon="♻️",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -28,7 +29,7 @@ if "tales_aberto" not in st.session_state:
 # #0f172a = azul muito escuro
 # #0c4a6e = azul profundo
 #
-# #38bdf8 = azul principal do CHIPPER
+# #38bdf8 = azul principal do CYPHER
 # #22d3ee = ciano
 # #22c55e = verde / sucesso / reciclagem
 #
@@ -53,7 +54,7 @@ st.markdown(
                =================================================
                MEXE EM:
                - Cor de fundo da página inteira
-               - Iluminação atrás do CHIPPER
+               - Iluminação atrás do CYPHER
                - Atmosfera geral do sistema
                ================================================= */
 
@@ -93,9 +94,9 @@ st.markdown(
                 margin-bottom: 35px;
             }
 
-            /* LOGO CHIPPER */
+            /* LOGO CYPHER */
             .logo {
-                font-family: "Brush Script MT", Brush Script Std, cursive;
+                font-family: "Arial Black", "Segoe UI", Arial, sans-serif;
                 font-size: 68px;
                 font-weight: 900;
                 letter-spacing: 12px;
@@ -273,7 +274,7 @@ st.markdown(
                 line-height: 1.6;
             }
 
-            /* RODAPÉ DO CHIPPER */
+            /* RODAPÉ DO CYPHER */
             .footer {
                 text-align: center;
                 color: #475569;
@@ -294,7 +295,7 @@ st.markdown(
 # =========================
 st.markdown(
     '<div class="hero">'
-    '<div class="logo" translate="no">CHIPPER</div>'
+    '<div class="logo" translate="no">CYPHER</div>'
     '<div class="subtitle">'
     'REVERSE LOGISTICS INTELLIGENCE'
     '</div>'
@@ -426,6 +427,9 @@ if iniciar_analise:
 # =========================
 st.markdown("---")
 
+if st.button("FAZER ANÁLISE DE PRODUTOS JÁ EXISTENTES", use_container_width=True):
+    st.switch_page("pages/06_importar_planilha.py")
+
 col_espaco, col_tales = st.columns(
     [8, 1]
 )
@@ -462,7 +466,7 @@ if st.session_state[
         '</div>'
 
         '<div class="tales-subtitle">'
-        'ASSISTENTE CHIPPER'
+        'ASSISTENTE CYPHER'
         '</div>'
 
         '<div class="tales-text">'
@@ -483,10 +487,10 @@ if st.session_state[
         'Clique em '
         '<strong>INICIAR ANÁLISE</strong>.<br><br>'
 
-        'O CHIPPER irá identificar o equipamento, '
+        'O CYPHER irá identificar o equipamento, '
         'consultar as fontes disponíveis e estimar '
-        'componentes, materiais recuperáveis, '
-        'potencial de recuperação e valor econômico.'
+        'componentes, composição estimada de materiais, '
+        'limitações de recuperação e valor bruto teórico.'
 
         '</div>'
 
@@ -506,7 +510,7 @@ if st.session_state[
 # =========================
 st.markdown(
     '<div class="footer">'
-    'CHIPPER CORE • MATERIAL INTELLIGENCE • Chipper International • 2026 • '
+    'CYPHER CORE • MATERIAL INTELLIGENCE • CYPHER International • 2026 • '
     'REVERSE LOGISTICS'
     '</div>',
     unsafe_allow_html=True,

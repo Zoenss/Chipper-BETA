@@ -16,6 +16,7 @@ from services.product_api_service import (
     buscar_produto_por_marca_codigo,
 )
 from services.upc_service import UPCItemDBError, buscar_produto_por_nome as buscar_upc_por_nome
+from services.wikidata_service import WikidataError, buscar_modelo_wikidata
 
 
 def _categoria_mobile(categoria: str) -> bool:
@@ -68,8 +69,27 @@ def _mobile_precisa_detalhes(dados: dict[str, Any]) -> bool:
     return preenchidos < 4
 
 
+def _modelo_compativel(consulta: str, candidato: str) -> bool:
+    """Aceita somente variantes inequívocas; jamais usa apenas similaridade numérica."""
+    def tokens(valor: str) -> list[str]:
+        valor = re.sub(r"[^a-z0-9]+", " ", str(valor).lower())
+        return [x for x in valor.split() if x not in
+                {"samsung", "galaxy", "apple", "motorola", "xiaomi", "5g", "4g", "lte"}]
+
+    a, b = tokens(consulta), tokens(candidato)
+    if not a or not b:
+        return False
+    # M55 e M55s são diferentes. O token do modelo deve coincidir exatamente.
+    model_a = [x for x in a if re.search(r"\d", x)]
+    model_b = [x for x in b if re.search(r"\d", x)]
+    if not model_a or not model_b:
+        return False
+    return model_a == model_b
+
+
 def _resumo_mobile(
     consulta: dict[str, Any] | None,
+    nome_solicitado: str,
 ) -> dict[str, Any] | None:
     if not consulta or not consulta.get("encontrado"):
         return None
@@ -82,8 +102,13 @@ def _resumo_mobile(
     if not isinstance(dispositivos, list) or not dispositivos:
         return None
 
+    candidatos = [d for d in dispositivos if isinstance(d, dict) and
+                  _modelo_compativel(nome_solicitado, d.get('name', ''))]
+    if not candidatos:
+        return None
+
     melhor = max(
-        dispositivos,
+        candidatos,
         key=lambda item: _pontuacao_match(
             item.get("match_certainty") if isinstance(item, dict) else None
         ),
@@ -200,11 +225,12 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
         "nome_informado": nome,
         "categoria_interna": categoria_interna,
         "categoria_final": categoria_interna,
-        "fonte_principal": "Motor interno do CHIPPER",
+        "fonte_principal": "Motor interno do CYPHER",
         "catalogo_local": produto_local,
         "mobileapi": None,
         "icecat": None,
         "upcitemdb": None,
+        "wikidata": None,
         "consulta_icecat": None,
         "fontes_utilizadas": [],
         "erros": [],
@@ -227,7 +253,9 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
     if deve_tentar_mobile:
         try:
             consulta_mobile = buscar_dispositivo(nome)
-            resumo_mobile = _resumo_mobile(consulta_mobile)
+            resumo_mobile = _resumo_mobile(consulta_mobile, nome)
+            if not resumo_mobile and consulta_mobile.get('encontrado'):
+                resultado['erros'].append('MobileAPI: resultados de modelos diferentes descartados; ficha não confirmada.')
 
             if resumo_mobile:
                 dados_mobile = resumo_mobile.get("dados", {})
@@ -248,6 +276,11 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
                                 f"MobileAPI detalhes: {erro}"
                             )
 
+                if not _modelo_compativel(nome, resumo_mobile.get('dados', {}).get('name', '')):
+                    resultado['erros'].append('MobileAPI: ficha detalhada de modelo diferente descartada.')
+                    resumo_mobile = None
+
+            if resumo_mobile:
                 resultado["mobileapi"] = resumo_mobile
                 resultado["fontes_utilizadas"].append("MobileAPI")
                 resultado["fonte_principal"] = "MobileAPI"
@@ -376,8 +409,27 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
                 "UPCitemdb: " f"{type(erro).__name__}"
             )
 
+    # Plano B por NOME: apenas quando catálogo, MobileAPI e Icecat não confirmaram.
+    possui_ficha = bool(
+        produto_local
+        or resultado.get("mobileapi")
+        or (isinstance(resultado.get("icecat"), dict)
+            and resultado["icecat"].get("encontrado"))
+    )
+    if not possui_ficha:
+        try:
+            wikidata = buscar_modelo_wikidata(nome)
+            resultado["wikidata"] = wikidata
+            if wikidata.get("encontrado"):
+                resultado["fontes_utilizadas"].append("Wikidata (identificação complementar)")
+                resultado["fonte_principal"] = "Wikidata (identificação complementar)"
+                resultado["encontrado"] = True
+                # Não inferir peso, características ou categoria a partir de texto livre.
+        except (WikidataError, ValueError) as erro:
+            resultado["erros"].append(f"Wikidata: {erro}")
+
     if not resultado["fontes_utilizadas"]:
-        resultado["fontes_utilizadas"].append("Motor interno do CHIPPER")
+        resultado["fontes_utilizadas"].append("Motor interno do CYPHER")
 
     if resultado.get("categoria_final") in {None, ""}:
         resultado["categoria_final"] = "desconhecido"

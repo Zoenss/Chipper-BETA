@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import Any
+import math
 
 
 # ============================================================
-# CHIPPER - ECONOMIC ENGINE
+# CYPHER - ECONOMIC ENGINE
 # ============================================================
 #
 # Responsável por transformar as massas estimadas pelo
@@ -130,7 +131,7 @@ ALIASES_MATERIAIS: dict[str, str] = {
 def normalizar_material(material: str) -> str:
     """
     Normaliza o nome recebido para o padrão utilizado
-    internamente pelo CHIPPER.
+    internamente pelo CYPHER.
     """
 
     if not material:
@@ -187,7 +188,7 @@ def calcular_valor_material(
 
     massa = float(massa_g)
 
-    if massa < 0:
+    if not math.isfinite(massa) or massa < 0:
         raise ValueError(
             "A massa do material não pode ser negativa."
         )
@@ -222,9 +223,9 @@ def calcular_valor_material(
             2,
         ),
 
-        "possui_preco": (
-            preco_por_grama > 0
-        ),
+        "possui_preco": (material_normalizado in PRECOS_REFERENCIA and preco_por_grama > 0),
+        "formula": f"{massa:.6f} g x R$ {preco_por_grama:.6f}/g",
+        "premissa_nao_validada": True,
     }
 
 
@@ -324,6 +325,9 @@ def calcular_valor_economico(
     return {
         "materiais": resultados,
 
+        "valor_bruto_estimado": round(valor_total, 2),
+        "retorno_liquido_estimado": None,
+        "custos_recuperacao_informados": False,
         "valor_total_estimado": round(
             valor_total,
             2,
@@ -358,11 +362,12 @@ def calcular_valor_economico(
 
         "fonte_precos": (
             "Tabela interna de preços de referência "
-            "do CHIPPER"
+            "do CYPHER"
         ),
 
         "observacao": (
-            "O valor econômico apresentado é uma estimativa. "
+            "Simulação baseada em composição por categoria e preços internos não auditados; " 
+            "não representa cotação atual, rendimento nem receita de venda. "
             "O cálculo utiliza a massa estimada de cada material "
             "e preços internos de referência por grama. "
             "O valor real de recuperação pode variar conforme "
@@ -492,7 +497,7 @@ if __name__ == "__main__":
     )
 
     print("=" * 60)
-    print("CHIPPER - ECONOMIC ENGINE")
+    print("CYPHER - ECONOMIC ENGINE")
     print("=" * 60)
 
     for item in resultado["materiais"]:

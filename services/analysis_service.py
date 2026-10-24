@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import math
 
 
 PERFIS: dict[str, dict[str, Any]] = {
@@ -318,6 +319,8 @@ def gerar_recomendacoes(categoria: str) -> list[str]:
 def validar_percentuais(perfil: dict[str, Any]) -> None:
     total = sum(float(valor) for valor in perfil["percentuais"].values())
 
+    if any(not math.isfinite(float(v)) or float(v) < 0 or float(v) > 1 for v in perfil["percentuais"].values()):
+        raise ValueError("Perfil com participação inválida.")
     if abs(total - 1.0) > 0.0001:
         raise ValueError(
             f"Os percentuais do perfil somam {total:.6f}, e deveriam somar 1.0."
@@ -328,7 +331,7 @@ def estimar_analise(
     categoria: str | None,
     massa_g: float,
 ) -> dict[str, Any]:
-    if massa_g <= 0:
+    if not math.isfinite(float(massa_g)) or float(massa_g) <= 0:
         raise ValueError("A massa deve ser maior que zero.")
 
     categoria_normalizada = normalizar_categoria(categoria)
@@ -340,8 +343,9 @@ def estimar_analise(
             "categoria_exibicao": "Equipamento eletrônico",
             "componentes": [],
             "materiais": [],
-            "massa_recuperavel_g": 0.0,
-            "percentual_recuperavel": 0.0,
+            "massa_recuperavel_g": None,
+            "percentual_recuperavel": None,
+            "recuperacao_confirmada": False,
             "recomendacoes": [
                 "Realizar inspeção técnica manual do equipamento.",
                 "Separar componentes funcionais.",
@@ -368,24 +372,26 @@ def estimar_analise(
             }
         )
 
-    percentual_outros = float(
-        perfil["percentuais"].get("Outros materiais", 0.0)
-    )
-
-    percentual_recuperavel = max(0.0, 1.0 - percentual_outros)
-    massa_recuperavel = massa_g * percentual_recuperavel
+    # Massa recuperável exige rendimento de processo verificado.
+    massa_recuperavel = None
 
     return {
         "categoria": categoria_normalizada,
         "categoria_exibicao": perfil["nome"],
         "componentes": list(perfil["componentes"]),
+        "componentes_confirmados": [],
+        "componentes_nao_confirmados": list(perfil["componentes"]),
+        "componentes_origem": "Lista típica da categoria; nenhuma peça verificada individualmente",
         "materiais": materiais,
-        "massa_recuperavel_g": round(massa_recuperavel, 2),
-        "percentual_recuperavel": round(percentual_recuperavel * 100, 2),
+        "massa_recuperavel_g": massa_recuperavel,
+        "percentual_recuperavel": None,
+        "recuperacao_confirmada": False,
         "recomendacoes": gerar_recomendacoes(categoria_normalizada),
         "observacao": (
+             "Composição estimada por categoria; massa efetivamente recuperável "
+            "depende de processo, rendimento e inspeção. " 
             "Os resultados apresentados são estimativas calculadas "
-            "pelo CHIPPER com base na categoria e na massa informada. "
+            "pelo CYPHER com base na categoria e na massa informada. "
             "Eles não representam desmontagem física, medição "
             "individual dos componentes ou análise laboratorial."
         ),
