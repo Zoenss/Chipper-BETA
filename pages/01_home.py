@@ -426,6 +426,9 @@ if iniciar_analise:
 # =========================
 st.markdown("---")
 
+if st.button("FAZER ANÁLISE DE PRODUTOS JÁ EXISTENTES", use_container_width=True):
+    st.switch_page("pages/06_importar_planilha.py")
+
 col_espaco, col_tales = st.columns(
     [8, 1]
 )
