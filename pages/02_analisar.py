@@ -13,6 +13,7 @@ from services.export_service import gerar_csv_analise
 from services.hybrid_product_service import resolver_produto_hibrido
 from services.tales_service import gerar_resumo_tales
 from services.tales_chat_service import responder_tales, _chave_gemini
+from services.material_guidance_service import orientar_materiais
 from services.theme_service import seletor_tema
 
 
@@ -1143,6 +1144,10 @@ with st.expander("🤖 Tales explica sua análise", expanded=True):
     )
     for fala in falas_tales:
         st.write(fala)
+    with st.expander("♻️ O que fazer com cada material?", expanded=False):
+        st.caption("Orientações gerais para materiais estimados; não confirmam sua presença ou uma rota local de coleta.")
+        for linha in orientar_materiais(materiais):
+            st.markdown(f"**{linha['material']}** — {linha['orientacao']}")
     st.markdown("**Pergunte ao Tales sobre esta análise**")
     pergunta_tales = st.text_input(
         "Sua pergunta", key="pergunta_tales",
