@@ -6,10 +6,24 @@ from services.economic_service import calcular_valor_economico, calcular_valor_m
 from services.export_service import gerar_csv_analise
 from services.tales_service import gerar_resumo_tales
 from services.batch_service import analisar_linha
+from services.tales_chat_service import responder_tales
+from services.upcdev_service import buscar_gtin_upcdev
 from services.analysis_service import validar_percentuais
 
 
 class TestCypher(unittest.TestCase):
+    def test_tales_interativo_local(self):
+        resposta, origem = responder_tales(
+            "Qual foi o valor?", ["O valor bruto teórico é R$ 339,12.", "Recuperação indeterminada."],
+            usar_ia=False
+        )
+        self.assertIn("339,12", resposta)
+        self.assertIn("Local", origem)
+
+    def test_upcdev_rejeita_gtin_invalido_sem_api(self):
+        with self.assertRaises(ValueError):
+            buscar_gtin_upcdev("ABCD")
+
     def test_tales_resumo_valido(self):
         frases = gerar_resumo_tales(
             equipamento_informado="Samsung M55 5G", modelo_identificado="Galaxy M55 5G",
