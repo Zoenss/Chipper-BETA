@@ -12,6 +12,7 @@ from services.economic_service import (
 from services.export_service import gerar_csv_analise
 from services.hybrid_product_service import resolver_produto_hibrido
 from services.tales_service import gerar_resumo_tales
+from services.tales_chat_service import responder_tales, _chave_gemini
 from services.theme_service import seletor_tema
 
 
@@ -1131,6 +1132,26 @@ with st.expander("🤖 Tales explica sua análise", expanded=True):
     )
     for fala in falas_tales:
         st.write(fala)
+    st.markdown("**Pergunte ao Tales sobre esta análise**")
+    pergunta_tales = st.text_input(
+        "Sua pergunta", key="pergunta_tales",
+        placeholder="Ex.: Como foi calculado o valor bruto?"
+    )
+    ia_disponivel = bool(_chave_gemini())
+    usar_ia_tales = st.checkbox(
+        "Usar IA para explicar (Gemini)", value=False,
+        disabled=not ia_disponivel,
+        help="Opcional; sem chave GEMINI_API_KEY o Tales responde com dados locais.",
+    )
+    if st.button("PERGUNTAR AO TALES") and pergunta_tales.strip():
+        resposta_tales, origem_tales = responder_tales(
+            pergunta_tales, falas_tales, usar_ia=usar_ia_tales
+        )
+        st.info(resposta_tales)
+        st.caption("Origem: " + origem_tales)
+    if not ia_disponivel:
+        st.caption("IA opcional não configurada. Tales continua disponível em modo local.")
+
 
 col_voltar, col_descartar, col_exportar = st.columns(3)
 
