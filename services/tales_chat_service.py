@@ -74,6 +74,14 @@ def responder_tales(pergunta: str, falas: list[str], *, usar_ia: bool = False) -
                             return saida, "Gemini (resposta gerada; confira os resultados)"
             except (requests.RequestException, ValueError, TypeError, KeyError):
                 pass
+    if any(x in consulta for x in ("componente", "peca", "hardware", "bateria", "tela", "placa")):
+        return (
+            "A lista do CYPHER representa componentes prováveis da categoria, não peças "
+            "confirmadas deste equipamento. Não tenho dados suficientes para afirmar quais "
+            "estão presentes, ausentes ou qual é o modelo de cada peça. Para confirmar, "
+            "consulte a documentação técnica do fabricante ou faça uma inspeção especializada.",
+            "Orientação local do Tales",
+        )
     if any(x in consulta for x in ("preço", "preco", "valor", "lucro", "dinheiro")):
         escolhidas = [f for f in falas if "valor bruto" in f.lower() or "preço" in f.lower()]
     elif any(x in consulta for x in ("recuper", "recicla", "descarte", "destino")):
