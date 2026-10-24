@@ -5,6 +5,7 @@ from services.analysis_service import estimar_analise, PERFIS, validar_percentua
 from services.economic_service import calcular_valor_economico, calcular_valor_material
 from services.export_service import gerar_csv_analise
 from services.tales_service import gerar_resumo_tales
+from services.batch_service import analisar_linha
 from services.analysis_service import validar_percentuais
 
 
@@ -35,6 +36,17 @@ class TestCypher(unittest.TestCase):
         self.assertIn("Massa incomum", texto)
         self.assertIn("não foi calculado", texto)
         self.assertNotIn("R$ 0", texto)
+
+    def test_importacao_em_lote(self):
+        resultado = analisar_linha("Samsung Galaxy M55 5G", 10, 1800)
+        self.assertEqual(resultado["quantidade"], 10)
+        self.assertAlmostEqual(resultado["massa_media_g"], 180)
+        self.assertIsNone(resultado["massa_recuperavel_g"])
+
+    def test_importacao_invalida(self):
+        for quantidade, massa in [(0, 100), (2.5, 100), (1, -10)]:
+            with self.assertRaises(ValueError):
+                analisar_linha("Teste", quantidade, massa)
 
     def test_lote_valido(self):
         r = validar_lote(10, 1800, "phone", 180)
