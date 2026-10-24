@@ -7,7 +7,7 @@ from services.export_service import gerar_csv_analise
 from services.tales_service import gerar_resumo_tales
 from services.batch_service import analisar_linha
 from services.tales_chat_service import responder_tales
-from services.upcdev_service import buscar_gtin_upcdev
+from services.wikidata_service import modelo_compativel, selecionar_resultado
 from services.analysis_service import validar_percentuais
 
 
@@ -20,9 +20,20 @@ class TestCypher(unittest.TestCase):
         self.assertIn("339,12", resposta)
         self.assertIn("Local", origem)
 
-    def test_upcdev_rejeita_gtin_invalido_sem_api(self):
-        with self.assertRaises(ValueError):
-            buscar_gtin_upcdev("ABCD")
+    def test_wikidata_modelo_exato(self):
+        self.assertTrue(modelo_compativel("Samsung Galaxy M55 5G", "Samsung Galaxy M55 5G"))
+        self.assertFalse(modelo_compativel("Samsung Galaxy M55 5G", "Samsung Galaxy M55s 5G"))
+        self.assertFalse(modelo_compativel("Samsung Galaxy M55 5G", "Xiaomi M55 5G"))
+
+    def test_wikidata_descarta_modelo_parecido(self):
+        achado = selecionar_resultado(
+            "Samsung Galaxy M55 5G",
+            [{"id": "Q123", "label": "Samsung Galaxy M55s 5G"},
+             {"id": "Q456", "label": "Samsung Galaxy M55 5G"}],
+        )
+        self.assertEqual(achado["id"], "Q456")
+        self.assertFalse(selecionar_resultado("Samsung Galaxy M55 5G",
+            [{"id": "Q123", "label": "Samsung Galaxy M55s 5G"}])["encontrado"])
 
     def test_tales_resumo_valido(self):
         frases = gerar_resumo_tales(
