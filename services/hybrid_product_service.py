@@ -16,6 +16,7 @@ from services.product_api_service import (
     buscar_produto_por_marca_codigo,
 )
 from services.upc_service import UPCItemDBError, buscar_produto_por_nome as buscar_upc_por_nome
+from services.upcdev_service import UPCDevError, buscar_gtin_upcdev
 
 
 def _categoria_mobile(categoria: str) -> bool:
@@ -224,11 +225,12 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
         "nome_informado": nome,
         "categoria_interna": categoria_interna,
         "categoria_final": categoria_interna,
-        "fonte_principal": "Motor interno do CHIPPER",
+        "fonte_principal": "Motor interno do CYPHER",
         "catalogo_local": produto_local,
         "mobileapi": None,
         "icecat": None,
         "upcitemdb": None,
+        "upcdev": None,
         "consulta_icecat": None,
         "fontes_utilizadas": [],
         "erros": [],
@@ -407,8 +409,23 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
                 "UPCitemdb: " f"{type(erro).__name__}"
             )
 
+    # Plano B sem custo: somente GTIN conhecido e somente se Icecat não confirmou.
+    gtin_local = str(produto_local.get("gtin") or "").strip() if produto_local else ""
+    if gtin_local and not (
+        isinstance(resultado.get("icecat"), dict)
+        and resultado["icecat"].get("encontrado")
+    ):
+        try:
+            complementar = buscar_gtin_upcdev(gtin_local)
+            resultado["upcdev"] = complementar
+            if complementar.get("encontrado"):
+                resultado["fontes_utilizadas"].append("upc.dev (GTIN)")
+                resultado["encontrado"] = True
+        except (UPCDevError, ValueError) as erro:
+            resultado["erros"].append(f"upc.dev: {erro}")
+
     if not resultado["fontes_utilizadas"]:
-        resultado["fontes_utilizadas"].append("Motor interno do CHIPPER")
+        resultado["fontes_utilizadas"].append("Motor interno do CYPHER")
 
     if resultado.get("categoria_final") in {None, ""}:
         resultado["categoria_final"] = "desconhecido"
