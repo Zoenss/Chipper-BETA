@@ -92,14 +92,33 @@ def responder_tales(pergunta: str, falas: list[str], *, usar_ia: bool = False) -
             "consulte a documentação técnica do fabricante ou faça uma inspeção especializada.",
             "Orientação local do Tales",
         )
-    if any(x in consulta for x in ("preço", "preco", "valor", "lucro", "dinheiro")):
-        escolhidas = [f for f in falas if "valor bruto" in f.lower() or "preço" in f.lower()]
-    elif any(x in consulta for x in ("recuper", "recicla", "descarte", "destino")):
-        escolhidas = [f for f in falas if "recuper" in f.lower() or "Próximo passo" in f]
-    elif any(x in consulta for x in ("massa", "peso", "quantidade")):
-        escolhidas = [f for f in falas if "massa total" in f.lower() or "Atenção:" in f]
-    elif any(x in consulta for x in ("modelo", "fonte", "api", "identific")):
-        escolhidas = falas[:1]
-    else:
-        escolhidas = falas[:3]
-    return "\n\n".join(escolhidas or falas[:2]), "Local (dados do CYPHER)"
+    if any(x in consulta for x in ("recuper", "recicla", "descarte", "destino")):
+        return (
+            "O CYPHER apresenta uma composição teórica do lote, mas não dispõe de "
+            "taxas verificadas para calcular a massa realmente recuperável. "
+            "Para avançar, avalie primeiro o reuso e reparo; depois encaminhe "
+            "placas, baterias e demais resíduos para triagem por operador especializado. "
+            "Solicite ao operador os rendimentos reais e comprovantes de destinação. "
+            "Não considere o valor bruto estimado como receita garantida.",
+            "Orientação local do Tales",
+        )
+    if any(x in consulta for x in ("preco", "valor", "lucro", "dinheiro")):
+        valores = [f for f in falas if "valor bruto" in f.lower() or "preço" in f.lower()]
+        return (" ".join(valores) if valores else
+                "Não há valor econômico confirmado para esta análise. "
+                "Os preços de referência são simulações, não ofertas de compra."), "Dados do CYPHER"
+    if any(x in consulta for x in ("massa", "peso", "quantidade")):
+        dados = [f for f in falas if "massa total" in f.lower()]
+        return (" ".join(dados) if dados else
+                "Não tenho dados suficientes para informar a massa ou quantidade."), "Dados do CYPHER"
+    if any(x in consulta for x in ("modelo", "fonte", "api", "identific")):
+        return (falas[0] if falas else
+                "Não tenho confirmação do modelo exato para esta análise."), "Dados do CYPHER"
+    return (
+        "Posso ajudar a interpretar esta análise e orientar os próximos passos. "
+        "Por exemplo, pergunte: 'Como iniciar a logística reversa?', "
+        "'O que fazer com o cobre?', 'Quais componentes não foram confirmados?' "
+        "ou 'Por que a massa recuperável não foi determinada?'. "
+        "Se sua dúvida for diferente, descreva-a com mais detalhes.",
+        "Orientação local do Tales",
+    )
