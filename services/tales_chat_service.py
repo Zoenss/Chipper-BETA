@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import unicodedata
+from services.material_guidance_service import DESTINOS
 import requests
 import streamlit as st
 
@@ -74,6 +75,15 @@ def responder_tales(pergunta: str, falas: list[str], *, usar_ia: bool = False) -
                             return saida, "Gemini (resposta gerada; confira os resultados)"
             except (requests.RequestException, ValueError, TypeError, KeyError):
                 pass
+    if any(x in consulta for x in ("o que fazer com", "destinar material", "destino do material", "separar material")):
+        mencionados = [(nome, orientacao) for nome, orientacao in DESTINOS.items()
+                       if _sem_acentos(nome) in consulta]
+        if mencionados:
+            nome, orientacao = mencionados[0]
+            return f"Sobre {nome}: {orientacao} Lembre-se: a composição indicada é estimada.", "Orientação local do Tales"
+        return ("Abra a seção 'O que fazer com cada material?' para ver orientações por tipo. "
+                "Posso detalhar cobre, alumínio, vidro, plásticos, ouro, prata ou materiais de bateria.",
+                "Orientação local do Tales")
     if any(x in consulta for x in ("componente", "peca", "hardware", "bateria", "tela", "placa")):
         return (
             "A lista do CYPHER representa componentes prováveis da categoria, não peças "
