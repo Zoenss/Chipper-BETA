@@ -3,8 +3,10 @@ from io import BytesIO
 import pandas as pd
 import streamlit as st
 from services.batch_service import analisar_linha
+from services.theme_service import seletor_tema
 
 st.set_page_config(page_title="CYPHER - Importar Planilha", page_icon="♻️", layout="wide")
+seletor_tema()
 st.title("Analisar produtos já existentes")
 st.caption("Importe uma planilha CSV ou Excel com as colunas equipamento, quantidade e massa_total_g.")
 st.info("Análise em lote usa o catálogo local e perfis por categoria. Não confirma cada modelo por API externa; massas, composições e preços são estimativas, não recuperação nem lucro.")
