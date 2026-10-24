@@ -12,6 +12,7 @@ from services.economic_service import (
 from services.export_service import gerar_csv_analise
 from services.hybrid_product_service import resolver_produto_hibrido
 from services.tales_service import gerar_resumo_tales
+from services.theme_service import seletor_tema
 
 
 st.set_page_config(
@@ -254,6 +255,7 @@ if (
 nome_aparelho = str(aparelho).strip()
 massa_total = float(peso)
 massa_media = massa_total / quantidade
+seletor_tema()
 nome_aparelho_seguro = escape(nome_aparelho)
 
 st.markdown(
