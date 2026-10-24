@@ -1,6 +1,7 @@
 """Perguntas do Tales: respostas locais por padrão, IA opcional e isolada dos cálculos."""
 from __future__ import annotations
 import os
+import unicodedata
 import requests
 import streamlit as st
 
@@ -15,11 +16,34 @@ def _chave_gemini() -> str:
         return ""
 
 
+def _sem_acentos(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", texto.lower())
+                   if not unicodedata.combining(c))
+
+
+def _orientar_logistica_reversa(falas: list[str]) -> str:
+    resposta = (
+        "Claro! Para começar a logística reversa, recomendo:\n\n"
+        "1. Inventarie seus equipamentos, quantidades, massas e estado de conservação.\n"
+        "2. Separe para reuso ou reparo o que ainda funciona. Não desmonte baterias sem capacitação.\n"
+        "3. Armazene os resíduos com segurança e isole baterias danificadas.\n"
+        "4. Identifique um ponto de entrega ou operador de logística reversa autorizado.\n"
+        "5. Registre a destinação e guarde comprovantes quando disponíveis.\n\n"
+        "Antes de entregar equipamentos com dados pessoais, faça o apagamento seguro. "
+        "O CYPHER estima materiais, mas não comprova a recuperação efetiva."
+    )
+    avisos = [f for f in falas if f.startswith("Atenção:")]
+    return resposta + ("\n\nConfira também: " + " ".join(avisos) if avisos else "")
+
+
 def responder_tales(pergunta: str, falas: list[str], *, usar_ia: bool = False) -> tuple[str, str]:
     texto = str(pergunta).strip()[:600]
     if not texto:
         return "Escreva sua dúvida sobre a análise para eu ajudar.", "Local"
     base = " ".join(str(fala) for fala in falas)[:5000]
+    consulta = _sem_acentos(texto)
+    if any(x in consulta for x in ("logistica reversa", "como descartar", "como comecar", "como iniciar", "primeiros passos")):
+        return _orientar_logistica_reversa(falas), "Orientação local do Tales"
     if usar_ia:
         chave = _chave_gemini()
         if chave:
@@ -29,7 +53,7 @@ def responder_tales(pergunta: str, falas: list[str], *, usar_ia: bool = False) -
                     headers={"x-goog-api-key": chave, "Content-Type": "application/json"},
                     json={
                         "system_instruction": {"parts": [{"text":
-                            "Você é Tales, assistente do CYPHER. Responda somente com fatos fornecidos "
+                             "Você é Tales, assistente técnico, cordial e objetivo do CYPHER. Responda diretamente à pergunta; quando pedir orientação, dê passos práticos. Para fatos específicos do equipamento, use somente dados fornecidos "
                             "no contexto da análise, sem inventar especificações, percentuais, preços ou "
                             "taxas de recuperação. Diferencie estimativa e dados identificados. "
                             "Se faltar informação diga que não está disponível. Seja breve em português."}]},
@@ -50,7 +74,6 @@ def responder_tales(pergunta: str, falas: list[str], *, usar_ia: bool = False) -
                             return saida, "Gemini (resposta gerada; confira os resultados)"
             except (requests.RequestException, ValueError, TypeError, KeyError):
                 pass
-    consulta = texto.lower()
     if any(x in consulta for x in ("preço", "preco", "valor", "lucro", "dinheiro")):
         escolhidas = [f for f in falas if "valor bruto" in f.lower() or "preço" in f.lower()]
     elif any(x in consulta for x in ("recuper", "recicla", "descarte", "destino")):
