@@ -41,7 +41,33 @@ def aplicar_tema():
     </style>""", unsafe_allow_html=True)
 
 
+def alternar_modo():
+    """Alterna claro/escuro sem perder a cor clara escolhida."""
+    atual = st.session_state.get("cypher_tema", "Escuro (original)")
+    if atual == "Escuro (original)":
+        st.session_state["cypher_tema"] = st.session_state.get(
+            "cypher_ultima_cor_clara", "Branco"
+        )
+    else:
+        st.session_state["cypher_ultima_cor_clara"] = atual
+        st.session_state["cypher_tema"] = "Escuro (original)"
+
+
+def lembrar_cor():
+    atual = st.session_state.get("cypher_tema")
+    if atual in {"Branco", "Azul", "Verde"}:
+        st.session_state["cypher_ultima_cor_clara"] = atual
+
+
 def seletor_tema():
-    st.selectbox("🎨 Cores do CYPHER", list(TEMAS),
-                 key="cypher_tema", help="Escolha a paleta visual. O nome e o logotipo não mudam.")
+    atual = st.session_state.get("cypher_tema", "Escuro (original)")
+    rotulo = "☀️ Light Mode" if atual == "Escuro (original)" else "🌙 Dark Mode"
+    st.button(rotulo, key="cypher_alternar_modo", on_click=alternar_modo)
+    st.selectbox(
+        "🎨 Cores do CYPHER",
+        list(TEMAS),
+        key="cypher_tema",
+        on_change=lembrar_cor,
+        help="Escolha a paleta. O botão acima alterna claro e escuro.",
+    )
     aplicar_tema()
