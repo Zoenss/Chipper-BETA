@@ -7,6 +7,7 @@ from services.export_service import gerar_csv_analise
 from services.tales_service import gerar_resumo_tales
 from services.batch_service import analisar_linha
 from services.tales_chat_service import responder_tales
+from services.material_guidance_service import orientar_materiais
 from services.wikidata_service import modelo_compativel, selecionar_resultado
 from services.analysis_service import validar_percentuais
 
@@ -33,6 +34,17 @@ class TestCypher(unittest.TestCase):
             componentes_nao_confirmados=estimativa["componentes_nao_confirmados"]
         )
         self.assertIn("não foram confirmados", " ".join(frases))
+
+    def test_tales_destino_material(self):
+        resposta, _ = responder_tales("O que fazer com cobre?", [], usar_ia=False)
+        self.assertIn("recicladores de metais", resposta)
+        resposta, _ = responder_tales("O que fazer com lítio?", [], usar_ia=False)
+        self.assertIn("coleta especializada", resposta)
+
+    def test_orientacoes_por_material(self):
+        rotas = orientar_materiais([{"material": "Cobre"}, {"material": "Outros materiais"}])
+        self.assertEqual(len(rotas), 2)
+        self.assertIn("triagem", rotas[1]["orientacao"])
 
     def test_tales_interativo_local(self):
         resposta, origem = responder_tales(
