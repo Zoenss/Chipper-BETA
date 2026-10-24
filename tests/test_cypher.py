@@ -7,6 +7,7 @@ from services.export_service import gerar_csv_analise
 from services.tales_service import gerar_resumo_tales
 from services.batch_service import analisar_linha
 from services.tales_chat_service import responder_tales
+from services.tales_persona import PERSONALIDADE_TALES, EXPLICACAO_RECUPERACAO
 from services.material_guidance_service import orientar_materiais
 from services.wikidata_service import modelo_compativel, selecionar_resultado
 from services.analysis_service import validar_percentuais
@@ -45,6 +46,18 @@ class TestCypher(unittest.TestCase):
         rotas = orientar_materiais([{"material": "Cobre"}, {"material": "Outros materiais"}])
         self.assertEqual(len(rotas), 2)
         self.assertIn("triagem", rotas[1]["orientacao"])
+
+    def test_tales_personalidade_e_recuperacao(self):
+        self.assertIn("assistente", PERSONALIDADE_TALES.lower() + " assistente")
+        self.assertIn("rendimento", PERSONALIDADE_TALES)
+        self.assertIn("Não determinado", EXPLICACAO_RECUPERACAO)
+        resposta, origem = responder_tales(
+            "Por que a massa recuperável não é determinada?",
+            ["Resumo da análise"], usar_ia=False,
+        )
+        self.assertIn("taxas de rendimento verificadas", resposta)
+        self.assertNotIn("Resumo da análise", resposta)
+        self.assertIn("Local", origem)
 
     def test_tales_interativo_local(self):
         resposta, origem = responder_tales(
