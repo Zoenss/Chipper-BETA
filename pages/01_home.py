@@ -1,6 +1,7 @@
 from textwrap import dedent
 
 import streamlit as st
+from services.theme_service import seletor_tema
 
 
 st.set_page_config(
