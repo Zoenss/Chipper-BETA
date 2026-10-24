@@ -14,6 +14,7 @@ from services.hybrid_product_service import resolver_produto_hibrido
 from services.tales_service import gerar_resumo_tales
 from services.tales_chat_service import responder_tales, _chave_gemini
 from services.material_guidance_service import orientar_materiais
+from services.tales_persona import EXPLICACAO_RECUPERACAO, APRESENTACAO_TALES
 from services.theme_service import seletor_tema
 
 
@@ -943,6 +944,8 @@ with r2:
         unsafe_allow_html=True,
     )
 
+st.info("🤖 Tales explica: " + EXPLICACAO_RECUPERACAO)
+
 st.markdown(
     '<div class="section-title">'
     'Recomendação de logística reversa'
@@ -1127,6 +1130,7 @@ if not modelo_tales and isinstance(dados_catalogo, dict):
 
 with st.expander("🤖 Tales explica sua análise", expanded=True):
     st.image("assets/tales.png", width=85)
+    st.caption(APRESENTACAO_TALES)
     falas_tales = gerar_resumo_tales(
         equipamento_informado=nome_aparelho,
         modelo_identificado=str(modelo_tales) if modelo_tales else None,
