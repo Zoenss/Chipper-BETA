@@ -18,6 +18,7 @@ def gerar_resumo_tales(
     massa_sem_preco_g: float | None,
     massa_recuperavel_g: float | None,
     percentual_recuperavel: float | None,
+    componentes_nao_confirmados: list[str] | None = None,
 ) -> list[str]:
     """Cria frases rastreáveis; nunca inventa confirmação, recuperação ou lucro."""
     if quantidade <= 0 or massa_total_g <= 0 or massa_media_g <= 0:
@@ -51,6 +52,10 @@ def gerar_resumo_tales(
         )
     else:
         linhas.append("Não há composição material suficiente para estimar os materiais deste equipamento.")
+    if componentes_nao_confirmados:
+        linhas.append("Os componentes listados são prováveis para a categoria, mas não foram "
+                     "confirmados individualmente neste equipamento. Peças e variantes podem "
+                     "diferir; a ausência de confirmação não significa ausência física.")
     if valor_bruto is None:
         linhas.append("O valor bruto teórico não foi calculado para esta análise.")
     else:
