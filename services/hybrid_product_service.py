@@ -16,7 +16,7 @@ from services.product_api_service import (
     buscar_produto_por_marca_codigo,
 )
 from services.upc_service import UPCItemDBError, buscar_produto_por_nome as buscar_upc_por_nome
-from services.upcdev_service import UPCDevError, buscar_gtin_upcdev
+from services.wikidata_service import WikidataError, buscar_modelo_wikidata
 
 
 def _categoria_mobile(categoria: str) -> bool:
@@ -230,7 +230,7 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
         "mobileapi": None,
         "icecat": None,
         "upcitemdb": None,
-        "upcdev": None,
+        "wikidata": None,
         "consulta_icecat": None,
         "fontes_utilizadas": [],
         "erros": [],
@@ -409,20 +409,24 @@ def resolver_produto_hibrido(nome_produto: str) -> dict[str, Any]:
                 "UPCitemdb: " f"{type(erro).__name__}"
             )
 
-    # Plano B sem custo: somente GTIN conhecido e somente se Icecat não confirmou.
-    gtin_local = str(produto_local.get("gtin") or "").strip() if produto_local else ""
-    if gtin_local and not (
-        isinstance(resultado.get("icecat"), dict)
-        and resultado["icecat"].get("encontrado")
-    ):
+    # Plano B por NOME: apenas quando catálogo, MobileAPI e Icecat não confirmaram.
+    possui_ficha = bool(
+        produto_local
+        or resultado.get("mobileapi")
+        or (isinstance(resultado.get("icecat"), dict)
+            and resultado["icecat"].get("encontrado"))
+    )
+    if not possui_ficha:
         try:
-            complementar = buscar_gtin_upcdev(gtin_local)
-            resultado["upcdev"] = complementar
-            if complementar.get("encontrado"):
-                resultado["fontes_utilizadas"].append("upc.dev (GTIN)")
+            wikidata = buscar_modelo_wikidata(nome)
+            resultado["wikidata"] = wikidata
+            if wikidata.get("encontrado"):
+                resultado["fontes_utilizadas"].append("Wikidata (identificação complementar)")
+                resultado["fonte_principal"] = "Wikidata (identificação complementar)"
                 resultado["encontrado"] = True
-        except (UPCDevError, ValueError) as erro:
-            resultado["erros"].append(f"upc.dev: {erro}")
+                # Não inferir peso, características ou categoria a partir de texto livre.
+        except (WikidataError, ValueError) as erro:
+            resultado["erros"].append(f"Wikidata: {erro}")
 
     if not resultado["fontes_utilizadas"]:
         resultado["fontes_utilizadas"].append("Motor interno do CYPHER")
