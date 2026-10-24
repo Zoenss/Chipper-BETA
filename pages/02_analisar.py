@@ -865,6 +865,8 @@ st.markdown(
 
 componentes = analise_estimada.get("componentes", [])
 if componentes:
+    st.caption("Componentes prováveis pelo perfil da categoria; presença e especificações não confirmadas individualmente.")
+if componentes:
     st.markdown(
         '<div class="card">'
         '<div class="card-title">COMPONENTES PROVÁVEIS</div>'
@@ -1137,6 +1139,7 @@ with st.expander("🤖 Tales explica sua análise", expanded=True):
         massa_sem_preco_g=massa_sem_preco if valor_total is not None else None,
         massa_recuperavel_g=massa_recuperavel,
         percentual_recuperavel=percentual_recuperavel,
+        componentes_nao_confirmados=analise_estimada.get("componentes_nao_confirmados", []),
     )
     for fala in falas_tales:
         st.write(fala)
