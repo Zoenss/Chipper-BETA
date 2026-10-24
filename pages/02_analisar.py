@@ -362,6 +362,14 @@ fontes_utilizadas = resultado_hibrido.get(
 if not isinstance(fontes_utilizadas, list):
     fontes_utilizadas = []
 
+if isinstance(resultado_hibrido.get("wikidata"), dict) and resultado_hibrido["wikidata"].get("encontrado"):
+    nome_wikidata = str(resultado_hibrido["wikidata"].get("nome") or "Modelo")
+    st.info(
+        "Wikidata encontrou uma identificação complementar: " + nome_wikidata +
+        ". Essa fonte não confirma massa, componentes nem ficha técnica. "
+        "A composição permanece estimada por categoria."
+    )
+
 erros_fontes = resultado_hibrido.get(
     "erros",
     [],
